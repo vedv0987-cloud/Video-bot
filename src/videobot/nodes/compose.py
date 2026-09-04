@@ -1,48 +1,75 @@
-"""Compose node — turns a script into a scene spec.
+"""Compose node — turns script, voice, alignment and beats into a scene spec.
 
-This is the node that encodes the motion contract: every timing it emits comes
-from the brand tokens, so retiming the house style is a token edit rather than
-a code change (UPGRADE-PLAN §5.1, §5.8).
+Scene boundaries now come from where the voice actually lands rather than from
+a word-count estimate, and every boundary is snapped to the beat grid when one
+is close enough (UPGRADE-PLAN §5.4). All timings still originate in the brand
+tokens, so retiming the house style stays a token edit.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
+from ..audio.speech import get_speech_backend
 from ..brand import Brand
 from ..cache import Artifact
 from ..dag import Node
 from ..hashing import digest_data
 from ..platforms import get_format
-from .script import WORDS_PER_SECOND
 
 MIN_SCENE_S = 2.2
-"""Below this a viewer cannot read the card, however good the animation."""
-
-SCENE_PAD_S = 0.9
-"""Breath either side of the spoken line, so cuts do not clip the voice."""
-
 ENTER_LEAD_S = 0.35
-"""Delay before the first element lands — a beat of empty frame reads as poise."""
-
 EXIT_LEAD_S = 0.30
-"""How far before the cut the exit begins."""
+BEAT_SNAP_S = 0.12
+"""Snap a cut to a beat only if it is already within 120ms of one — beyond
+that, moving it would fight the voice rather than serve it."""
+
+LAYOUTS = {"hook": "statement-center", "point": "statement-card", "cta": "end-card"}
+ROLES = {"hook": "display", "point": "headline", "cta": "body"}
 
 
 def _round(value: float) -> float:
-    """3dp keeps the timeline exactly contiguous under float addition."""
     return round(value + 0.0, 3)
 
 
-def _scene_length(words: int) -> float:
-    return _round(max(MIN_SCENE_S, words / WORDS_PER_SECOND + SCENE_PAD_S))
+def _snap(value: float, beats: Sequence[float]) -> float:
+    """Pull `value` onto the nearest beat within tolerance."""
+    if not beats:
+        return value
+    nearest = min(beats, key=lambda beat: abs(beat - value))
+    return nearest if abs(nearest - value) <= BEAT_SNAP_S else value
+
+
+def scene_boundaries(
+    sections: Sequence[Mapping[str, Any]], duration: float, beats: Sequence[float]
+) -> list[float]:
+    """Cut points between consecutive spoken sections.
+
+    A cut lands in the silence between two sections, not on top of a word.
+    Boundaries are then forced monotonic with a readable minimum, because a
+    beat snap must never produce a scene too short to read.
+    """
+    boundaries = [0.0]
+    for current, following in zip(sections, sections[1:]):
+        midpoint = (current["t1"] + following["t0"]) / 2
+        candidate = _snap(midpoint, beats)
+        candidate = max(candidate, boundaries[-1] + MIN_SCENE_S)
+        boundaries.append(_round(candidate))
+
+    boundaries.append(_round(duration))
+
+    # A late snap can push a boundary past the end; walk back from the tail.
+    for index in range(len(boundaries) - 2, 0, -1):
+        if boundaries[index] > boundaries[index + 1] - MIN_SCENE_S:
+            boundaries[index] = _round(boundaries[index + 1] - MIN_SCENE_S)
+    return boundaries
 
 
 class ComposeNode(Node):
     name = "compose"
-    version = "1"
-    deps = ("script",)
+    version = "3"
+    deps = ("script", "voice", "align", "beats")
     suffix = ".json"
 
     def params(self, ctx: Mapping[str, Any]) -> dict[str, Any]:
@@ -58,122 +85,165 @@ class ComposeNode(Node):
         brand: Brand = ctx["brand"]
         fmt = get_format(ctx["aspect"])
         script = inputs["script"].read_json()
+        alignment = inputs["align"].read_json()
+        beat_map = inputs["beats"].read_json()
 
-        scenes: list[dict[str, Any]] = []
-        cursor = 0.0
-        for section in script["sections"]:
-            length = _scene_length(section["words"])
-            scene = self._scene(section, brand, start=cursor, length=length)
-            scenes.append(scene)
-            cursor = scene["out"]
+        duration = alignment["duration_s"]
+        beats = [beat for beat in beat_map["beats"] if beat <= duration]
 
-        claims = {c["id"]: c for c in script["claims"]}
+        # Pair by id, not by index: a section that produced no words has no
+        # span, and index-pairing would silently shift every later scene onto
+        # the wrong boundary.
+        spans = {section["id"]: section for section in alignment["sections"]}
+        spoken = [section for section in script["sections"] if section["id"] in spans]
+        boundaries = scene_boundaries([spans[s["id"]] for s in spoken], duration, beats)
+
+        scenes = [
+            self._scene(section, brand, beats, start=boundaries[index], out=boundaries[index + 1])
+            for index, section in enumerate(spoken)
+        ]
+
         citations = [
             {
-                "id": claim_id,
+                "id": claim["id"],
                 "claim": claim["text"],
                 "source": claim["source"],
+                "url": claim["url"],
                 "verified": claim["verified"],
             }
-            for claim_id, claim in claims.items()
+            for claim in script["claims"]
         ]
         unverified = [c["id"] for c in citations if not c["verified"]]
 
+        # A claim card is the only place a source reaches the viewer. Without
+        # one the video says nothing sourced, however long the citation list is.
+        claim_cards = sum(1 for section in script["sections"] if section["kind"] == "point")
+
+        notes = [f"rewriter: {script['rewriter']}"]
+        if script["rejected"]:
+            notes.append(
+                f"{len(script['rejected'])} passage(s) dropped by the safety screen: "
+                + ", ".join(sorted({item["category"] for item in script["rejected"]}))
+            )
+        for failure in script.get("source_failures", []):
+            notes.append(f"source {failure['source']} failed: {failure['error']}")
+        if unverified:
+            notes.append(f"unverified claim(s): {', '.join(unverified)}")
+        if not citations:
+            notes.append("no citations retrieved — nothing on screen is sourced")
+        if not claim_cards:
+            notes.append("no claim cards — the cut carries no sourced content")
+
+        backend = get_speech_backend(ctx["voice"])
         spec = {
             "version": "1.0",
             "meta": {
                 "topic": script["topic"],
                 "slug": ctx["slug"],
-                "duration_s": _round(cursor),
+                "duration_s": _round(duration),
                 "aspect": fmt.aspect,
                 "fps": fmt.fps,
                 "resolution": list(fmt.authoring),
             },
             "brand": brand.ref(),
-            "audio": {"vo": None, "music": None, "beats": [], "words": []},
+            "audio": {
+                "vo": inputs["voice"].as_ref(),
+                "music": None,
+                "beats": beats,
+                # `section` is alignment bookkeeping, not part of the spec's
+                # word record; the schema rejects it.
+                "words": [
+                    {"w": word["w"], "t0": word["t0"], "t1": word["t1"]}
+                    for word in alignment["words"]
+                ],
+                "provenance": {
+                    "voice": {"backend": backend.name, "model": backend.model},
+                    "alignment": {"method": alignment["method"]},
+                    "beats": {"method": beat_map["method"], "bpm": beat_map["bpm"]},
+                },
+            },
             "scenes": scenes,
             "captions": brand.captions_block(fmt.safe_area),
             "citations": citations,
             "compliance": {
-                "gate": "passed" if not unverified else "pending",
-                "requires_human_signoff": True,
-                "notes": (
-                    [f"{len(unverified)} unverified claim(s): {', '.join(unverified)}"]
-                    if unverified
-                    else []
+                "gate": (
+                    "pending" if (unverified or not citations or not claim_cards) else "passed"
                 ),
+                "requires_human_signoff": True,
+                "notes": notes,
             },
         }
         return json.dumps(spec, indent=2, ensure_ascii=False).encode("utf-8")
 
     def _scene(
-        self, section: Mapping[str, Any], brand: Brand, *, start: float, length: float
+        self,
+        section: Mapping[str, Any],
+        brand: Brand,
+        beats: Sequence[float],
+        *,
+        start: float,
+        out: float,
     ) -> dict[str, Any]:
-        out = _round(start + length)
-        elements = self._elements(section, brand, start=start, out=out)
+        element = self._element(section, brand, beats, start=start, out=out)
         return {
             "id": section["id"],
             "in": _round(start),
-            "out": out,
+            "out": _round(out),
             "tier": "A",
-            "layout": {"hook": "statement-center", "list": "list-reveal", "cta": "end-card"}[
-                section["kind"]
-            ],
+            "layout": LAYOUTS[section["kind"]],
             "bg": {
                 "type": "gradient-mesh",
-                # Deterministic per scene: the same spec always renders the
-                # same background, which is what makes renders reproducible.
                 "seed": int(digest_data(section["id"])[:6], 16),
                 "drift": 0.02,
             },
-            "elements": elements,
+            "elements": [element],
         }
 
-    def _elements(
-        self, section: Mapping[str, Any], brand: Brand, *, start: float, out: float
-    ) -> list[dict[str, Any]]:
+    def _element(
+        self,
+        section: Mapping[str, Any],
+        brand: Brand,
+        beats: Sequence[float],
+        *,
+        start: float,
+        out: float,
+    ) -> dict[str, Any]:
         enter_dur = brand.duration_s("entrance")
         exit_dur = brand.duration_s("exit")
-        stagger = brand.stagger_s
-        exit_at = _round(out - EXIT_LEAD_S - exit_dur)
 
-        def transitions(index: int) -> dict[str, Any]:
-            return {
-                "in": {
-                    "at": _round(start + ENTER_LEAD_S + index * stagger),
-                    "anim": "rise-blur",
-                    "ease": brand.ease("entrance"),
-                    "dur": enter_dur,
-                    "snap": "none",
-                },
-                "out": {
-                    "at": exit_at,
-                    "anim": "fade-scale",
-                    "ease": brand.ease("exit"),
-                    "dur": exit_dur,
-                    "snap": "none",
-                },
-            }
+        # Fit the lead-in to the scene: a short scene gets a shorter beat of
+        # empty frame rather than an entrance that overruns its own cut.
+        headroom = out - start - enter_dur - exit_dur - EXIT_LEAD_S
+        lead = min(ENTER_LEAD_S, max(0.0, headroom * 0.5))
+        enter_at = max(start, _snap(start + lead, beats))
 
-        role = {"hook": "display", "list": "headline", "cta": "headline"}[section["kind"]]
-        elements: list[dict[str, Any]] = [
-            {"type": "text", "id": "lead", "role": role, "content": section["text"], **transitions(0)}
-        ]
+        exit_at = out - EXIT_LEAD_S - exit_dur
+        if exit_at < enter_at + enter_dur:
+            exit_at = min(out - exit_dur, enter_at + enter_dur)
 
-        if section["kind"] == "list":
-            items = section["items"]
-            element: dict[str, Any] = {
-                "type": "list",
-                "id": "points",
-                "role": "body",
-                "items": items,
-                "stagger_ms": brand.tokens["motion"]["stagger_ms"],
-                **transitions(1),
-            }
-            # A list carries several claims; the spec cites one per element, so
-            # attach the first and let Phase 2 split multi-claim lists.
-            if section["cites"]:
-                element["cite"] = section["cites"][0]
-            elements.append(element)
-
-        return elements
+        element: dict[str, Any] = {
+            "type": "text",
+            "id": "lead",
+            "role": ROLES[section["kind"]],
+            "content": section["text"],
+            "in": {
+                "at": _round(enter_at),
+                "anim": "rise-blur",
+                "ease": brand.ease("entrance"),
+                "dur": enter_dur,
+                "snap": "beat" if beats else "none",
+            },
+            "out": {
+                "at": _round(exit_at),
+                "anim": "fade-scale",
+                "ease": brand.ease("exit"),
+                "dur": exit_dur,
+                "snap": "none",
+            },
+        }
+        # Only a claim card cites a source. The hook and the credit line are
+        # connective text; pointing them at a paper would misrepresent what
+        # that paper supports. Every reference still appears in `citations`.
+        if section["kind"] == "point" and section["cites"]:
+            element["cite"] = section["cites"][0]
+        return element

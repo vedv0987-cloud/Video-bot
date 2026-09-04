@@ -16,7 +16,17 @@ _MINIMAL: dict[str, Any] = {
         "resolution": [2160, 3840],
     },
     "brand": {"id": "health-v2", "digest": "abcdef1234567890"},
-    "audio": {"vo": None, "music": None, "beats": [], "words": []},
+    "audio": {
+        "vo": None,
+        "music": None,
+        "beats": [],
+        "words": [],
+        "provenance": {
+            "voice": {"backend": "null", "model": "silence"},
+            "alignment": {"method": "estimated"},
+            "beats": {"method": "fixed-tempo", "bpm": 92},
+        },
+    },
     "scenes": [
         {
             "id": "hook",

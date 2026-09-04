@@ -1,19 +1,28 @@
 """Pipeline nodes.
 
-Phase 1 wires the graph end to end with placeholder content so the cache,
-schema, and validator are provable before any model is loaded. `research` and
-`script` are replaced in Phase 2; `compose` is the real thing already.
+    research ─▶ script ─▶ voice ─┬─▶ align ─┐
+                                 └─▶ beats ─┴─▶ compose ─▶ scene-spec.json
 """
 
 from ..dag import Node
+from .align import AlignNode
+from .beats import BeatsNode
 from .compose import ComposeNode
 from .research import ResearchNode
 from .script import ScriptNode
+from .voice import VoiceNode
 
-__all__ = ["ComposeNode", "ResearchNode", "ScriptNode", "default_nodes"]
+__all__ = [
+    "AlignNode",
+    "BeatsNode",
+    "ComposeNode",
+    "ResearchNode",
+    "ScriptNode",
+    "VoiceNode",
+    "default_nodes",
+]
 
 
 def default_nodes() -> dict[str, Node]:
-    """The Phase 1 graph: research -> script -> compose."""
-    nodes = [ResearchNode(), ScriptNode(), ComposeNode()]
+    nodes = [ResearchNode(), ScriptNode(), VoiceNode(), AlignNode(), BeatsNode(), ComposeNode()]
     return {node.name: node for node in nodes}

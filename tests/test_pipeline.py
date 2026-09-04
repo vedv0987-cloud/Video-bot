@@ -88,12 +88,18 @@ def test_slugify_rejects_unusable_topic():
 
 
 def run_cli(tmp_path, *extra):
+    """CLI runs stay offline: these cover wiring, not retrieval.
+
+    Live sources are exercised against fakes in test_nodes.py, so the suite
+    never depends on Wikipedia or PubMed being reachable.
+    """
     return main(
         [
             "--topic", "hydration",
             "--brand", BRAND_PATH,
             "--cache", str(tmp_path / "cache"),
             "--out", str(tmp_path / "out"),
+            "--offline",
             *extra,
         ]
     )
@@ -104,16 +110,32 @@ def test_cli_emits_a_valid_spec(tmp_path):
 
     spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
     spec_mod.validate(spec)
-    assert [s["id"] for s in spec["scenes"]] == ["hook", "facts", "prevention", "cta"]
+    assert [s["id"] for s in spec["scenes"]] == ["hook", "cta"]
     assert spec["meta"]["resolution"] == [2160, 3840]
+    assert spec["audio"]["vo"]["node"] == "voice"
+    assert spec["audio"]["words"]
 
 
-def test_placeholder_research_leaves_the_gate_closed(tmp_path):
-    """Phase 1 content is unverified by construction, so it can never publish."""
+def test_offline_runs_cannot_publish(tmp_path):
+    """With no retrieval there is nothing sourced, so the gate stays shut."""
     run_cli(tmp_path)
     spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    assert spec["citations"] == []
     assert spec["compliance"]["gate"] == "pending"
-    assert all(not c["verified"] for c in spec["citations"])
+
+
+def test_provenance_marks_estimated_timings_as_estimated(tmp_path):
+    """An estimate must never read as a measurement."""
+    run_cli(tmp_path)
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    provenance = spec["audio"]["provenance"]
+    assert provenance["voice"]["backend"] == "null"
+    assert provenance["alignment"]["method"] == "estimated"
+    assert provenance["beats"] == {"method": "fixed-tempo", "bpm": 92}
+
+
+def test_uninstalled_backend_exits_with_a_usage_error(tmp_path):
+    assert run_cli(tmp_path, "--voice", "kokoro") == 2
 
 
 def test_spec_is_deterministic_across_runs(tmp_path):
@@ -129,8 +151,11 @@ def test_run_report_records_cache_state_and_provenance(tmp_path):
     run_cli(tmp_path)
 
     report = json.loads((tmp_path / "out" / "hydration" / "run.json").read_text())
-    assert report["cache"]["hits"] == ["research", "script", "compose"]
+    assert report["cache"]["hits"] == [
+        "research", "script", "voice", "align", "beats", "compose",
+    ]
     assert report["brand"]["id"] == "health-v2"
+    assert report["backends"]["voice"] == "null"
     assert "generated_utc" in report
 
 
