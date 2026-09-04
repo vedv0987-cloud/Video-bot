@@ -1,0 +1,664 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vedv0987-cloud/Video-bot/schema/scene-spec.schema.json",
+  "title": "Scene Spec",
+  "description": "The declarative seam between the content layer and the motion layer (docs/UPGRADE-PLAN.md \u00a72). Engine-agnostic by design.",
+  "type": "object",
+  "required": [
+    "version",
+    "meta",
+    "brand",
+    "audio",
+    "scenes",
+    "captions",
+    "citations",
+    "compliance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "1.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "brand": {
+      "$ref": "#/$defs/brandRef"
+    },
+    "audio": {
+      "$ref": "#/$defs/audio"
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scene"
+      }
+    },
+    "captions": {
+      "$ref": "#/$defs/captions"
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/citation"
+      }
+    },
+    "compliance": {
+      "$ref": "#/$defs/compliance"
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "topic",
+        "slug",
+        "duration_s",
+        "aspect",
+        "fps",
+        "resolution"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "topic": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slug": {
+          "$ref": "#/$defs/slug"
+        },
+        "duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 180
+        },
+        "aspect": {
+          "enum": [
+            "9:16",
+            "1:1",
+            "16:9"
+          ]
+        },
+        "fps": {
+          "type": "integer",
+          "enum": [
+            24,
+            25,
+            30,
+            50,
+            60
+          ]
+        },
+        "resolution": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "description": "No build timestamp: the spec must be a pure function of its inputs or the content-addressed cache never hits. Run provenance lives in run.json."
+    },
+    "brandRef": {
+      "type": "object",
+      "required": [
+        "id",
+        "digest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "digest": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    },
+    "artifactRef": {
+      "type": "object",
+      "required": [
+        "node",
+        "digest",
+        "path"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "node": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "required": [
+        "vo",
+        "music",
+        "beats",
+        "words"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "vo": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "music": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "track",
+                "duck"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "track": {
+                  "$ref": "#/$defs/artifactRef"
+                },
+                "duck": {
+                  "enum": [
+                    "sidechain",
+                    "static",
+                    "none"
+                  ]
+                },
+                "gain_db": {
+                  "type": "number"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/seconds"
+          }
+        },
+        "words": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/word"
+          }
+        }
+      }
+    },
+    "word": {
+      "type": "object",
+      "required": [
+        "w",
+        "t0",
+        "t1"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "w": {
+          "type": "string",
+          "minLength": 1
+        },
+        "t0": {
+          "$ref": "#/$defs/seconds"
+        },
+        "t1": {
+          "$ref": "#/$defs/seconds"
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "required": [
+        "at",
+        "anim",
+        "ease",
+        "dur"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/seconds"
+        },
+        "anim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ease": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dur": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "snap": {
+          "enum": [
+            "beat",
+            "none"
+          ]
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": [
+        "id",
+        "in",
+        "out",
+        "tier",
+        "layout",
+        "bg",
+        "elements"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "in": {
+          "$ref": "#/$defs/seconds"
+        },
+        "out": {
+          "$ref": "#/$defs/seconds"
+        },
+        "tier": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "description": "A = 2D vector engine, B = Blender 3D, C = After Effects"
+        },
+        "layout": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bg": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "elements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/element"
+          }
+        }
+      }
+    },
+    "element": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/textElement"
+        },
+        {
+          "$ref": "#/$defs/counterElement"
+        },
+        {
+          "$ref": "#/$defs/listElement"
+        },
+        {
+          "$ref": "#/$defs/imageElement"
+        },
+        {
+          "$ref": "#/$defs/shapeElement"
+        }
+      ]
+    },
+    "elementBase": {
+      "id": {
+        "$ref": "#/$defs/slug"
+      },
+      "role": {
+        "enum": [
+          "display",
+          "headline",
+          "body",
+          "caption",
+          "accent"
+        ]
+      },
+      "in": {
+        "$ref": "#/$defs/transition"
+      },
+      "out": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/transition"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "textElement": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "role",
+        "content",
+        "in",
+        "out"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "role": {
+          "$ref": "#/$defs/elementBase/role"
+        },
+        "in": {
+          "$ref": "#/$defs/transition"
+        },
+        "out": {
+          "$ref": "#/$defs/elementBase/out"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cite": {
+          "type": "string"
+        }
+      }
+    },
+    "counterElement": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "role",
+        "from",
+        "to",
+        "in",
+        "out"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "counter"
+        },
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "role": {
+          "$ref": "#/$defs/elementBase/role"
+        },
+        "in": {
+          "$ref": "#/$defs/transition"
+        },
+        "out": {
+          "$ref": "#/$defs/elementBase/out"
+        },
+        "from": {
+          "type": "number"
+        },
+        "to": {
+          "type": "number"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "cite": {
+          "type": "string"
+        }
+      }
+    },
+    "listElement": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "role",
+        "items",
+        "in",
+        "out"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "list"
+        },
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "role": {
+          "$ref": "#/$defs/elementBase/role"
+        },
+        "in": {
+          "$ref": "#/$defs/transition"
+        },
+        "out": {
+          "$ref": "#/$defs/elementBase/out"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "stagger_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "cite": {
+          "type": "string"
+        }
+      }
+    },
+    "imageElement": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "role",
+        "src",
+        "in",
+        "out"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "role": {
+          "$ref": "#/$defs/elementBase/role"
+        },
+        "in": {
+          "$ref": "#/$defs/transition"
+        },
+        "out": {
+          "$ref": "#/$defs/elementBase/out"
+        },
+        "src": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/artifactRef"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain"
+          ]
+        }
+      }
+    },
+    "shapeElement": {
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "role",
+        "shape",
+        "in",
+        "out"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "shape"
+        },
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "role": {
+          "$ref": "#/$defs/elementBase/role"
+        },
+        "in": {
+          "$ref": "#/$defs/transition"
+        },
+        "out": {
+          "$ref": "#/$defs/elementBase/out"
+        },
+        "shape": {
+          "enum": [
+            "plate",
+            "rule",
+            "dot",
+            "ring"
+          ]
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "required": [
+        "style",
+        "max_words",
+        "safe_area"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "style": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_words": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "safe_area": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "required": [
+        "id",
+        "claim",
+        "source",
+        "verified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string"
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "compliance": {
+      "type": "object",
+      "required": [
+        "gate",
+        "requires_human_signoff"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "gate": {
+          "enum": [
+            "pending",
+            "passed",
+            "failed"
+          ]
+        },
+        "requires_human_signoff": {
+          "const": true
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
