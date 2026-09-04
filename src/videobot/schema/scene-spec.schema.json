@@ -153,7 +153,8 @@
         "vo",
         "music",
         "beats",
-        "words"
+        "words",
+        "provenance"
       ],
       "additionalProperties": false,
       "properties": {
@@ -207,6 +208,69 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/word"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "How the timings were produced. An estimate must never be mistaken for a measurement.",
+          "required": [
+            "voice",
+            "alignment",
+            "beats"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "voice": {
+              "type": "object",
+              "required": [
+                "backend",
+                "model"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "backend": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                }
+              }
+            },
+            "alignment": {
+              "type": "object",
+              "required": [
+                "method"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "enum": [
+                    "estimated",
+                    "whisperx"
+                  ]
+                }
+              }
+            },
+            "beats": {
+              "type": "object",
+              "required": [
+                "method",
+                "bpm"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "enum": [
+                    "fixed-tempo",
+                    "librosa"
+                  ]
+                },
+                "bpm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            }
           }
         }
       }

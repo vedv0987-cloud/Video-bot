@@ -5,17 +5,33 @@ Automated short-form health & fitness video pipeline — free and open-source en
 - [`video-bot-roadmap.md`](video-bot-roadmap.md) — the original ten-stage pipeline
 - [`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md) — v2 architecture, 2026 tool stack, and the craft rules
 
-## Status: Phase 1 — foundation & the seam
+## Status: Phase 2 — content layer complete
 
 The content layer produces a **scene spec**: a declarative, engine-agnostic
-description of the finished video. Nothing here renders pixels — the motion
-layer consumes the spec and is deliberately swappable (UPGRADE-PLAN §2).
+description of the finished video, with live citations, a voiceover, word
+timings and a beat map. Nothing here renders pixels — the motion layer consumes
+the spec and is deliberately swappable (UPGRADE-PLAN §2).
 
 ```
-research ──▶ script ──▶ compose ──▶ scene-spec.json
-   │           │           │
-   └───────────┴───────────┴──▶ content-addressed cache (.cache/)
+research ──▶ script ──▶ voice ─┬─▶ align ─┐
+    │           │              └─▶ beats ─┴─▶ compose ──▶ scene-spec.json
+    └───────────┴─────────────────────────────────▶ cache (.cache/)
 ```
+
+Retrieval is live (Wikipedia + PubMed). Voice, alignment and beats sit behind
+interfaces with deterministic offline defaults, so the graph runs anywhere and
+the real models drop in unchanged on a machine with a GPU.
+
+| Stage | Default here | Swap in with |
+| --- | --- | --- |
+| Rewriter | `template` (verbatim) | `--rewriter qwen3` (Ollama) |
+| Voice | `null` (silent, correct length) | `--voice kokoro` / `chatterbox` |
+| Alignment | `estimated` | `--aligner whisperx` |
+| Beats | `fixed-tempo` | `--beats librosa` |
+
+Uninstalled backends fail with an install command, never an ImportError.
+Whatever ran is recorded in `audio.provenance` — an estimate must never read as
+a measurement.
 
 ## Quick start
 
@@ -33,7 +49,9 @@ Output lands in `output/<slug>/`:
 | `run.json` | Provenance: when it ran, cache hits/misses, artifact digests, warnings. |
 
 Useful flags: `--aspect {9:16,1:1,16:9}`, `--brand <tokens.json>`, `--print`,
-`--force <node>` to recompute a node, `--strict` to fail on lint warnings.
+`--force <node>` to recompute a node, `--strict` to fail on lint warnings, and
+`--offline` to skip retrieval entirely (which produces an uncited spec that
+cannot pass the gate — useful for CI).
 
 ## Layout
 
@@ -44,11 +62,15 @@ src/videobot/
 ├── cache.py                  content-addressed artifact cache
 ├── dag.py                    node graph + runner
 ├── spec.py                   scene spec validation and craft linting
+├── safety.py                 blocked-category screening for health claims
 ├── brand.py                  token loading
+├── http.py                   throttled stdlib HTTP for the sources
+├── sources/                  wikipedia + pubmed retrieval
+├── audio/                    speech, alignment, beats
 ├── platforms.py              delivery formats and platform safe areas
 ├── hashing.py                canonical hashing
 ├── schema/                   JSON Schemas for the spec and the tokens
-└── nodes/                    research → script → compose
+└── nodes/                    research → script → voice → align/beats → compose
 ```
 
 ## Two design rules worth knowing before you edit
@@ -63,15 +85,33 @@ when its logic changes; that is what invalidates old artifacts.
 
 ## The compliance gate
 
-Health content is YMYL, so the pipeline refuses to publish claims it cannot
-source (UPGRADE-PLAN §7.1). `compliance.gate` only reaches `passed` when every
-citation is verified, and `requires_human_signoff` is `true` by construction.
-Phase 1's placeholder research is unverified on purpose — the gate stays
-`pending` and nothing can ship.
+Health content is YMYL, so the pipeline refuses to publish what it cannot
+source (UPGRADE-PLAN §7.1). Four things have to hold before `compliance.gate`
+reaches `passed`:
+
+1. Every claim is bound to a **pinned, resolvable** source — a PMID or a
+   Wikipedia revision id. "According to Wikipedia" is not a citation.
+2. Every passage clears the **safety screen**: no dosages, named drugs, drug
+   interactions, diagnosis language, cure/treatment framing, or therapeutic
+   supplement claims. The patterns deliberately over-block, and every drop is
+   reported with its reason rather than vanishing.
+3. At least one **claim card** reaches the screen. Citations the viewer never
+   sees are not sourced content.
+4. Retrieval did not silently fail. A dead source degrades the run, but it is
+   always recorded in `compliance.notes`.
+
+`requires_human_signoff` is `true` by construction. *Verified* here means
+"traced to a pinned source", not "endorsed by a clinician" — which is exactly
+why a person still presses publish.
+
+The rewriter is swappable, but `assert_no_invented_claims` runs against every
+backend's output: cited ids must exist, and any number in the script must
+appear in the source it cites. Models invent plausible statistics far more
+readily than whole sentences, so that is the check that earns its keep.
 
 ## Next
 
-Phase 2 replaces `nodes/research.py` and `nodes/script.py` with real retrieval
-(Wikipedia + PubMed), citation capture, a constrained Qwen3 rewrite, Kokoro /
-Chatterbox-Turbo voiceover, WhisperX word alignment, and a librosa beat map.
-The spec schema already has the fields waiting.
+Phase 3 builds the Tier A motion engine: a Motion Canvas project, a spec→scene
+compiler, and the component library (statement card, stat counter, list reveal,
+lower third, end card) with the easing, stagger and motion-blur defaults from
+UPGRADE-PLAN §5.1–5.2 baked in.

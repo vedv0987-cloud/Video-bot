@@ -16,11 +16,16 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .audio.align import ALIGNERS
+from .audio.beats import BEAT_SOURCES, DEFAULT_BPM
+from .audio.speech import BackendUnavailable, SPEECH_BACKENDS
 from .brand import BrandError, load_brand
 from .cache import Cache
 from .dag import Runner
 from .nodes import default_nodes
+from .nodes.script import REWRITERS, InventedClaimError
 from .platforms import FORMATS
+from .sources import SourceSet, live_sources
 from . import spec as spec_mod
 
 DEFAULT_BRAND = Path("brand/health-v2.json")
@@ -54,6 +59,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--strict", action="store_true", help="exit non-zero if any lint warning is raised"
     )
+
+    backends = parser.add_argument_group("backends")
+    backends.add_argument("--voice", default="null", choices=sorted(SPEECH_BACKENDS))
+    backends.add_argument("--rewriter", default="template", choices=sorted(REWRITERS))
+    backends.add_argument("--aligner", default="estimated", choices=sorted(ALIGNERS))
+    backends.add_argument("--beats", default="fixed-tempo", choices=sorted(BEAT_SOURCES))
+    backends.add_argument("--bpm", type=float, default=DEFAULT_BPM)
+    backends.add_argument(
+        "--offline",
+        action="store_true",
+        help="skip live retrieval; produces an uncited spec that cannot pass the gate",
+    )
     return parser
 
 
@@ -67,12 +84,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    ctx = {"topic": args.topic, "slug": slug, "aspect": args.aspect, "brand": brand}
+    ctx = {
+        "topic": args.topic,
+        "slug": slug,
+        "aspect": args.aspect,
+        "brand": brand,
+        "sources": SourceSet(()) if args.offline else live_sources(),
+        "rewriter": args.rewriter,
+        "voice": args.voice,
+        "aligner": args.aligner,
+        "beats": args.beats,
+        "bpm": args.bpm,
+    }
     force = frozenset(name for name in args.force.split(",") if name)
 
     runner = Runner(Cache(args.cache), default_nodes())
     try:
         report = runner.run(ctx, force=force)
+    except (BackendUnavailable, InventedClaimError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     except KeyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -99,6 +130,14 @@ def main(argv: list[str] | None = None) -> int:
                 "topic": args.topic,
                 "aspect": args.aspect,
                 "brand": brand.ref(),
+                "backends": {
+                    "rewriter": args.rewriter,
+                    "voice": args.voice,
+                    "aligner": args.aligner,
+                    "beats": args.beats,
+                },
+                "sources": ctx["sources"].describe(),
+                "screened_out": report.artifacts["script"].read_json()["rejected"],
                 "cache": {"hits": report.hits, "misses": report.misses},
                 "artifacts": {
                     name: artifact.as_ref() for name, artifact in report.artifacts.items()
@@ -116,11 +155,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  [{state}] {name}  {report.artifacts[name].digest}")
     print(f"\nspec:  {spec_path}")
     print(f"run:   {run_path}")
+    screened = report.artifacts["script"].read_json()["rejected"]
     print(
         f"scenes: {len(scene_spec['scenes'])}  "
         f"duration: {scene_spec['meta']['duration_s']}s  "
+        f"citations: {len(scene_spec['citations'])}  "
         f"gate: {scene_spec['compliance']['gate']}"
     )
+    if screened:
+        print(f"\nsafety screen dropped {len(screened)} passage(s):")
+        for item in screened:
+            print(f"  - [{item['category']}] {item['reason']}")
+            print(f"      {item['text'][:88]}")
 
     if warnings:
         print(f"\n{len(warnings)} warning(s):")

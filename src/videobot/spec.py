@@ -191,6 +191,10 @@ def lint(spec: dict[str, Any]) -> list[str]:
                     f"(expected 0.20-0.80s)"
                 )
 
+    if not any(scene["layout"] == "statement-card" for scene in spec["scenes"]):
+        warnings.append(
+            "no claim cards — a hook and an end card with nothing between them is not a video"
+        )
     if not spec["audio"]["words"]:
         warnings.append("audio.words is empty — captions cannot be generated without alignment")
     if spec["compliance"]["gate"] != "passed":
