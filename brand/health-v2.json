@@ -1,0 +1,82 @@
+{
+  "$schema": "../src/videobot/schema/brand-tokens.schema.json",
+  "id": "health-v2",
+  "name": "Health v2",
+
+  "color": {
+    "bg": "#0b1220",
+    "surface": "#111c2e",
+    "ink": "#f2f6ff",
+    "ink_muted": "#9aa9c4",
+    "accent": "#38e0a6",
+    "accent_alt": "#4c8dff",
+    "warn": "#ffb347",
+    "gradient": ["#0b1220", "#16304a"]
+  },
+
+  "type": {
+    "display": {
+      "family": "Inter",
+      "fallback": ["Inter Variable", "Helvetica Neue", "sans-serif"],
+      "weight": 800,
+      "size": 148,
+      "tracking": -0.022,
+      "leading": 1.02
+    },
+    "headline": {
+      "family": "Inter",
+      "fallback": ["Inter Variable", "Helvetica Neue", "sans-serif"],
+      "weight": 700,
+      "size": 96,
+      "tracking": -0.015,
+      "leading": 1.12
+    },
+    "body": {
+      "family": "Inter",
+      "fallback": ["Inter Variable", "Helvetica Neue", "sans-serif"],
+      "weight": 500,
+      "size": 62,
+      "tracking": -0.005,
+      "leading": 1.32
+    },
+    "caption": {
+      "family": "Inter",
+      "fallback": ["Inter Variable", "Helvetica Neue", "sans-serif"],
+      "weight": 800,
+      "size": 84,
+      "tracking": -0.01,
+      "leading": 1.15
+    }
+  },
+
+  "space": { "unit": 16, "margin_x": 192, "margin_y": 260, "radius": 56 },
+
+  "motion": {
+    "ease": {
+      "entrance": "expo.out",
+      "exit": "cubic.in",
+      "emphasis": "back.out(1.4)",
+      "counter": "expo.out",
+      "ambient": "sine.inOut"
+    },
+    "duration_ms": {
+      "entrance": 400,
+      "exit": 220,
+      "emphasis": 300,
+      "counter": 1050,
+      "ambient": 12000
+    },
+    "stagger_ms": 75,
+    "motion_blur": { "shutter_deg": 180, "samples": 6, "threshold_px_per_s": 600 }
+  },
+
+  "captions": {
+    "style": "karaoke-pop",
+    "max_words": 3,
+    "active_color": "#38e0a6",
+    "idle_color": "#f2f6ff",
+    "outline_px": 6
+  },
+
+  "grade": { "lut": "grade/health-v2.cube" }
+}

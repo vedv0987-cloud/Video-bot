@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vedv0987-cloud/Video-bot/schema/brand-tokens.schema.json",
+  "title": "Brand Tokens",
+  "description": "One file, read by every scene, so fifty videos look like one studio made them (docs/UPGRADE-PLAN.md §5.8).",
+  "type": "object",
+  "required": ["id", "name", "color", "type", "space", "motion", "captions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "name": { "type": "string", "minLength": 1 },
+
+    "color": {
+      "type": "object",
+      "required": ["bg", "surface", "ink", "ink_muted", "accent"],
+      "additionalProperties": { "$ref": "#/$defs/colorValue" },
+      "properties": {
+        "bg": { "$ref": "#/$defs/hex" },
+        "surface": { "$ref": "#/$defs/hex" },
+        "ink": { "$ref": "#/$defs/hex" },
+        "ink_muted": { "$ref": "#/$defs/hex" },
+        "accent": { "$ref": "#/$defs/hex" },
+        "accent_alt": { "$ref": "#/$defs/hex" },
+        "warn": { "$ref": "#/$defs/hex" },
+        "gradient": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/hex" } }
+      }
+    },
+
+    "type": {
+      "type": "object",
+      "required": ["display", "headline", "body", "caption"],
+      "additionalProperties": { "$ref": "#/$defs/typeStyle" }
+    },
+
+    "space": {
+      "type": "object",
+      "required": ["unit", "margin_x", "margin_y", "radius"],
+      "additionalProperties": false,
+      "properties": {
+        "unit": { "type": "number", "exclusiveMinimum": 0 },
+        "margin_x": { "type": "number", "minimum": 0 },
+        "margin_y": { "type": "number", "minimum": 0 },
+        "radius": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "motion": {
+      "type": "object",
+      "required": ["ease", "duration_ms", "stagger_ms", "motion_blur"],
+      "additionalProperties": false,
+      "properties": {
+        "ease": {
+          "type": "object",
+          "required": ["entrance", "exit", "emphasis", "counter", "ambient"],
+          "additionalProperties": { "type": "string", "minLength": 1 },
+          "description": "Named curves. Never 'linear' — see UPGRADE-PLAN §5.1."
+        },
+        "duration_ms": {
+          "type": "object",
+          "required": ["entrance", "exit", "emphasis", "counter", "ambient"],
+          "additionalProperties": { "type": "integer", "exclusiveMinimum": 0 }
+        },
+        "stagger_ms": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "motion_blur": {
+          "type": "object",
+          "required": ["shutter_deg", "samples", "threshold_px_per_s"],
+          "additionalProperties": false,
+          "properties": {
+            "shutter_deg": { "type": "number", "exclusiveMinimum": 0, "maximum": 360 },
+            "samples": { "type": "integer", "minimum": 1, "maximum": 32 },
+            "threshold_px_per_s": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+
+    "captions": {
+      "type": "object",
+      "required": ["style", "max_words", "active_color", "idle_color"],
+      "additionalProperties": false,
+      "properties": {
+        "style": { "type": "string", "minLength": 1 },
+        "max_words": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "active_color": { "$ref": "#/$defs/hex" },
+        "idle_color": { "$ref": "#/$defs/hex" },
+        "outline_px": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "grade": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "lut": { "type": "string" } }
+    }
+  },
+
+  "$defs": {
+    "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "colorValue": {
+      "oneOf": [
+        { "$ref": "#/$defs/hex" },
+        { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/hex" } }
+      ]
+    },
+    "typeStyle": {
+      "type": "object",
+      "required": ["family", "weight", "size", "tracking", "leading"],
+      "additionalProperties": false,
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "fallback": { "type": "array", "items": { "type": "string" } },
+        "weight": { "type": "integer", "minimum": 100, "maximum": 1000 },
+        "size": { "type": "number", "exclusiveMinimum": 0, "description": "px at 2160x3840 authoring scale" },
+        "tracking": { "type": "number" },
+        "leading": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}
