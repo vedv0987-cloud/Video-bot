@@ -33,7 +33,40 @@ Get-CimInstance Win32_Processor | Select Name, NumberOfCores
 
 ---
 
-## 2. macOS / Apple Silicon
+## 2. Confirmed target machine
+
+**MacBook Air · Apple M5 · 10 cores (4 performance / 6 efficiency) · 16 GB unified memory ·
+macOS 26.6.2 · 286 GB free.**
+
+Two facts drive every decision below.
+
+**16 GB unified memory is the binding constraint.** macOS and open apps take 4–6 GB, so
+budget **~10 GB for models**. That is comfortable for everything this pipeline needs and
+firmly rules out the large ones.
+
+**The Air is fanless.** It will hold a burst indefinitely-fast and then throttle under
+sustained load. Anything that runs for more than a few minutes wants to be an overnight
+batch, lid open, charger in — not a foreground task you sit and watch.
+
+| Stage | Verdict on this machine | Footprint |
+| --- | --- | --- |
+| Content layer (research → spec) | ✅ Trivial, CPU-only | — |
+| Kokoro voice | ✅ Faster than real time | ~400 MB |
+| Chatterbox-Turbo | ✅ Use the CPU path | ~1.5 GB |
+| WhisperX alignment | ✅ 30-second clips are seconds of work | ~3 GB |
+| Motion Canvas + ffmpeg | ✅ VideoToolbox hardware encode | — |
+| Qwen3 rewriter | ✅ **8B quantised** — not 14B, not 27B | ~5 GB |
+| ACE-Step music | ⚠️ Run it alone, nothing else open | ~8 GB |
+| Generative video | ❌ Not on this machine. Rent NVIDIA | 25–30 GB |
+
+**Do not run the pipeline with After Effects or Premiere open.** On 16 GB you will hit
+memory pressure and swap, and everything gets slower at once.
+
+Disk is not a constraint: the recommended stack is ~10 GB against 286 GB free.
+
+---
+
+## 3. macOS / Apple Silicon — background
 
 **The headline: a MacBook is a good machine for this pipeline.** Everything except
 generative video runs well natively, and generative video is the least load-bearing part
@@ -94,7 +127,7 @@ B-roll, every time.
 
 ---
 
-## 3. NVIDIA tiers (Windows / Linux)
+## 4. NVIDIA tiers (Windows / Linux)
 
 For completeness, and for the rented-GPU case.
 
@@ -108,7 +141,7 @@ CUDA torch must match your driver — install from the selector at
 
 ---
 
-## 4. Install order
+## 5. Install order
 
 Five stages. Each ends with a command that proves it worked, so a failure is isolated to
 the stage that caused it. Do not proceed past a failing verification.
@@ -185,7 +218,7 @@ precisely so a render tells you whether its timings were measured or estimated.
 
 ```bash
 brew install ollama && ollama serve      # or the installer from ollama.com
-ollama pull qwen3
+ollama pull qwen3:8b        # 8B on 16 GB — larger variants will swap
 videobot --topic "hydration" --rewriter qwen3
 ```
 
@@ -194,7 +227,7 @@ run fails loudly rather than publishing it — that check exists for exactly thi
 
 ---
 
-## 5. Disk budget
+## 6. Disk budget
 
 | Asset | Size |
 | --- | --- |
@@ -208,7 +241,7 @@ run fails loudly rather than publishing it — that check exists for exactly thi
 
 ---
 
-## 6. Automation
+## 7. Automation
 
 **macOS** — `launchd` is the native scheduler; cron still works and is simpler:
 
@@ -234,7 +267,7 @@ what cron thinks. `caffeinate -s` in the wrapper if you need it awake.
 
 ---
 
-## 7. What stays in the cloud
+## 8. What stays in the cloud
 
 | Work | Where | Why |
 | --- | --- | --- |
@@ -250,12 +283,14 @@ anywhere, commit it for reproducibility.
 
 ---
 
-## 8. Order of operations
+## 9. Order of operations
 
-1. Report your chip and unified memory — confirms which row of §2 you are in.
-2. Stage 1. A working pipeline in ten minutes on any Mac.
-3. Stage 2 with Kokoro. First real voiceover.
-4. Phase 3 (Motion Canvas) — first actual video. **This is the step that changes what the
-   output looks like**, and it needs no GPU at all.
-5. Stages 3–5 when you want measured alignment and a smarter rewriter.
-6. Generative video: only if a specific piece needs it, on rented hardware.
+1. **Stage 1** — working pipeline, ten minutes, no GPU.
+2. **Stage 2 with Kokoro** — first real voiceover. Skip Chatterbox until you have heard
+   Kokoro and decided it is not good enough.
+3. **Phase 3 (Motion Canvas)** — first actual video. **This is the step that changes what
+   the output looks like**, it needs no GPU, and on this machine it is the single highest
+   return in the plan.
+4. **Stages 3–5** when you want measured alignment and a smarter rewriter.
+5. **Generative video** — not on this machine. Rent an hour of NVIDIA if a specific piece
+   ever needs it.
