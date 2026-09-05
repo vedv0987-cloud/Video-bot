@@ -40,6 +40,28 @@ else
   ok "dependencies present"
 fi
 
+# node_modules can be present while the browser is not. Playwright downloads
+# browsers outside npm — into ~/Library/Caches/ms-playwright — so an npm install
+# that ran before a Playwright version bump leaves node_modules complete and the
+# browser missing. The only reliable check is to launch one, the same way the
+# renderer does, rather than to look for a file.
+say "Headless browser"
+if node --input-type=module -e "
+import { chromium } from 'playwright';
+import { existsSync } from 'node:fs';
+const path = process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium';
+const browser = await chromium.launch({
+  executablePath: existsSync(path) ? path : undefined,
+  args: ['--no-sandbox', '--use-gl=swiftshader'],
+});
+await browser.close();
+" >/dev/null 2>&1; then
+  ok "launches"
+else
+  warn "downloading Chromium (~150 MB, once)"
+  npx --yes playwright install chromium
+fi
+
 node scripts/prepare-data.mjs "$SPEC"
 node scripts/render.mjs "$@"
 
