@@ -117,8 +117,28 @@ function credit(plan: RenderPlan, scene: PlannedScene): Txt | null {
   });
 }
 
-/** Keeps type legible over imagery without flattening the picture. */
-function scrim(plan: RenderPlan): Rect {
+/**
+ * Keeps type legible over imagery without flattening the picture.
+ *
+ * Two weights, because the two media kinds are doing different jobs. A still is
+ * there to give the frame depth, so it can be pushed right back. Footage *is*
+ * the picture, and the heavy scrim buries it: measured, the still weighting
+ * left every frame 80-93% opaque, which rendered muted footage as flat black
+ * and only let saturated test patterns through at all.
+ */
+function scrim(plan: RenderPlan, overFootage: boolean): Rect {
+  const stops = overFootage
+    ? [
+        { offset: 0, color: `${plan.background}b3` },
+        { offset: 0.45, color: `${plan.background}59` },
+        { offset: 1, color: `${plan.background}c4` },
+      ]
+    : [
+        { offset: 0, color: `${plan.background}f2` },
+        { offset: 0.45, color: `${plan.background}cc` },
+        { offset: 1, color: `${plan.background}fa` },
+      ];
+
   return new Rect({
     width: plan.width,
     height: plan.height,
@@ -126,13 +146,7 @@ function scrim(plan: RenderPlan): Rect {
       type: 'linear',
       from: [0, -plan.height / 2],
       to: [0, plan.height / 2],
-      // Heavy on purpose. A still is there to give the frame depth, not to
-      // compete with the sentence the viewer is reading.
-      stops: [
-        { offset: 0, color: `${plan.background}f2` },
-        { offset: 0.45, color: `${plan.background}cc` },
-        { offset: 1, color: `${plan.background}fa` },
-      ],
+      stops,
     }),
   });
 }
@@ -159,7 +173,7 @@ export function* renderScene(
 
   const media = mediaLayer(plan, scene);
   if (media) root.add(media.node);
-  if (media || overFootage) root.add(scrim(plan));
+  if (media || overFootage) root.add(scrim(plan, overFootage));
 
   const built = scene.elements.map((element) =>
     chooseComponent(scene.layout, element)({

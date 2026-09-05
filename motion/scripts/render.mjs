@@ -146,7 +146,7 @@ function footageFilter(scenes, width, height, duration) {
     .map((scene, index) => ({ scene, index }))
     .filter(({ scene }) => scene.media?.kind === 'video' && scene.media.src)
     .filter(({ scene }) => scene.in < duration);
-  if (clips.length === 0) return { inputs: [], filter: null };
+  if (clips.length === 0) return { inputs: [], filter: null, clipCount: 0 };
 
   const inputs = [];
   const parts = [`color=c=black:s=${width}x${height}:r=${fps}:d=${duration}[bed0]`];
@@ -154,12 +154,23 @@ function footageFilter(scenes, width, height, duration) {
   clips.forEach(({ scene }, order) => {
     const span = Math.max(0.04, Math.min(scene.out, duration) - scene.in);
     const from = scene.media.trim?.from ?? 0;
-    inputs.push('-i', resolve(root, scene.media.src.replace(/^\//, '')));
-    // The clip is shorter than the scene often enough to matter; looping the
-    // input rather than the filter keeps a scene from freezing on a last frame.
+
+    // -stream_loop repeats a clip shorter than its scene. Without it the
+    // scene runs out of picture and falls through to the black bed, which
+    // reads as a dropout rather than as a cut.
+    inputs.push('-stream_loop', '-1', '-i', resolve(root, scene.media.src.replace(/^\//, '')));
+
+    // The +scene.in shift is the whole trick. setpts=PTS-STARTPTS alone puts
+    // the clip at t=0 of the output while the overlay only switches on at the
+    // scene's start, so the clip plays out invisibly and the scene shows
+    // whatever is left — nothing, for any clip shorter than its own start
+    // time. Measured: a 3s clip on a scene starting at 3s rendered black
+    // throughout, while an 8s clip on the same scene looked correct, which is
+    // exactly how this survived its first test.
     parts.push(
       `[${order + 1}:v]trim=start=${from.toFixed(3)}:duration=${span.toFixed(3)},` +
-        `setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase,` +
+        `setpts=PTS-STARTPTS+${scene.in.toFixed(3)}/TB,` +
+        `scale=${width}:${height}:force_original_aspect_ratio=increase,` +
         `crop=${width}:${height},fps=${fps},format=rgba[clip${order}]`,
     );
     parts.push(
@@ -169,7 +180,7 @@ function footageFilter(scenes, width, height, duration) {
   });
 
   parts.push(`[bed${clips.length}][0:v]overlay=x=0:y=0:shortest=1,noise=alls=5:allf=t+u,format=yuv420p[v]`);
-  return { inputs, filter: parts.join(';') };
+  return { inputs, filter: parts.join(';'), clipCount: clips.length };
 }
 
 const composite = footageFilter(spec.scenes ?? [], outW, outH, duration);
@@ -184,7 +195,7 @@ const args = [
   ...composite.inputs,
   ...(hasAudio ? ['-i', voPath] : []),
   ...(composite.filter ? ['-filter_complex', composite.filter, '-map', '[v]'] : ['-vf', video]),
-  ...(composite.filter && hasAudio ? ['-map', `${composite.inputs.length / 2 + 1}:a`] : []),
+  ...(composite.filter && hasAudio ? ['-map', `${composite.clipCount + 1}:a`] : []),
   '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p',
   '-movflags', '+faststart',
   ...(hasAudio
