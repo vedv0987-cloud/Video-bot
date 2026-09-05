@@ -7,7 +7,7 @@ the cache, and only calls `produce` on a miss.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .cache import Artifact, Cache
 
@@ -85,12 +85,17 @@ class Runner:
         self,
         ctx: Mapping[str, Any],
         force: frozenset[str] = frozenset(),
+        on_node: Callable[[str, bool, str], None] | None = None,
     ) -> RunReport:
         """Run every node in dependency order.
 
         `force` names nodes to recompute even on a cache hit. Their downstream
         nodes re-run only if the forced node's content actually changed — which
         is the point of keying on digests rather than on timestamps.
+
+        `on_node(name, was_cached, digest)` fires as each node settles, so a
+        caller can report progress while the graph is still running. A voice
+        node that takes half a minute should not look like a hang.
         """
         unknown = force - self.nodes.keys()
         if unknown:
@@ -116,4 +121,6 @@ class Runner:
             else:
                 report.hits.append(name)
             report.artifacts[name] = artifact
+            if on_node is not None:
+                on_node(name, name in report.hits, artifact.digest)
         return report

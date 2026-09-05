@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Studio</title>
+<style>
+  :root {
+    --bg: #0b1220; --surface: #111c2e; --surface-2: #16233a; --line: #223350;
+    --ink: #f2f6ff; --muted: #9aa9c4; --accent: #38e0a6; --alt: #4c8dff; --warn: #ffb347;
+    --radius: 14px;
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font);
+    font-size: 15px; line-height: 1.5;
+    background-image: radial-gradient(1100px 620px at 12% -10%, #16304a 0%, transparent 62%);
+    min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 26px 32px 18px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 21px; margin: 0; letter-spacing: -0.02em; font-weight: 800; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+  main { display: grid; grid-template-columns: 400px 1fr; gap: 26px; padding: 26px 32px 60px; align-items: start; }
+  @media (max-width: 940px) { main { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .card + .card { margin-top: 18px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted);
+       margin: 0 0 14px; font-weight: 700; }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+  input[type=text], select {
+    width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px;
+  }
+  input[type=text]:focus, select:focus { outline: 2px solid var(--alt); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .checks { margin-top: 16px; display: grid; gap: 10px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+  .check input { margin-top: 3px; }
+  .check span small { display: block; color: var(--muted); font-size: 12px; }
+
+  button {
+    margin-top: 18px; width: 100%; padding: 13px; border-radius: 10px; border: 0;
+    background: var(--accent); color: #06231a; font-weight: 800; font-size: 15px;
+    font-family: var(--font); cursor: pointer; letter-spacing: -0.01em;
+  }
+  button:disabled { opacity: 0.45; cursor: progress; }
+
+  .steps { display: grid; gap: 8px; }
+  .step {
+    display: grid; grid-template-columns: 20px 1fr auto; gap: 11px; align-items: center;
+    padding: 9px 12px; border-radius: 9px; background: var(--surface-2);
+    border: 1px solid transparent; font-size: 14px;
+  }
+  .step.active { border-color: var(--alt); }
+  .step.done { border-color: rgba(56,224,166,0.35); }
+  .step .mark { color: var(--muted); font-size: 13px; }
+  .step.done .mark { color: var(--accent); }
+  .step .tag { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--surface-2); border-radius: 11px; padding: 13px; }
+  .stat b { display: block; font-size: 23px; letter-spacing: -0.02em; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .pass { color: var(--accent); } .pending { color: var(--warn); }
+
+  video { width: 100%; max-height: 62vh; border-radius: 11px; background: #000; display: block; }
+  .placeholder {
+    border: 1px dashed var(--line); border-radius: 11px; padding: 46px 20px; text-align: center;
+    color: var(--muted); font-size: 14px;
+  }
+  .note { font-size: 13px; color: var(--muted); margin-top: 12px; }
+  .error {
+    background: rgba(255,120,120,0.09); border: 1px solid rgba(255,120,120,0.4);
+    color: #ffc9c9; border-radius: 10px; padding: 13px; font-size: 13px; white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 14px;
+  }
+  .screened { margin-top: 14px; font-size: 13px; }
+  .screened li { color: var(--muted); margin-bottom: 6px; }
+  .library { display: grid; gap: 9px; }
+  .run {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    padding: 11px 13px; border-radius: 10px; background: var(--surface-2); cursor: pointer;
+    border: 1px solid transparent; font-size: 14px;
+  }
+  .run:hover { border-color: var(--line); }
+  .run small { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Video Studio</h1>
+  <span class="sub"><span class="dot"></span> running locally · health &amp; fitness pipeline</span>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>New video</h2>
+      <label for="topic">Topic</label>
+      <input id="topic" type="text" placeholder="hydration" value="hydration" autocomplete="off">
+      <div class="row">
+        <div>
+          <label for="aspect">Aspect</label>
+          <select id="aspect"></select>
+        </div>
+        <div>
+          <label for="voice">Voice</label>
+          <select id="voice"></select>
+        </div>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="render" checked>
+          <span>Render the MP4<small>Off gives you the scene spec only, in seconds</small></span></label>
+        <label class="check"><input type="checkbox" id="preview">
+          <span>Preview quality<small>Quarter scale, first 4 seconds — for checking a look</small></span></label>
+        <label class="check"><input type="checkbox" id="media">
+          <span>Attach stills<small>Wikimedia Commons; often irrelevant for health topics</small></span></label>
+      </div>
+      <button id="go">Generate</button>
+      <p class="note" id="hint">First render of a topic takes a few minutes. Cached ones are instant.</p>
+    </div>
+
+    <div class="card">
+      <h2>Pipeline</h2>
+      <div class="steps" id="steps"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>Result</h2>
+      <div class="stats" id="stats" hidden>
+        <div class="stat"><b id="s-scenes">–</b><span>Scenes</span></div>
+        <div class="stat"><b id="s-duration">–</b><span>Seconds</span></div>
+        <div class="stat"><b id="s-citations">–</b><span>Citations</span></div>
+        <div class="stat"><b id="s-gate">–</b><span>Gate</span></div>
+      </div>
+      <div id="viewer"><div class="placeholder">Nothing rendered yet.</div></div>
+      <div id="problems"></div>
+    </div>
+
+    <div class="card">
+      <h2>Library</h2>
+      <div class="library" id="library"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const NODES = [];
+
+async function boot() {
+  const options = await (await fetch('/api/options')).json();
+  fill($('aspect'), options.aspects, '9:16');
+  fill($('voice'), options.voices, 'kokoro');
+  NODES.push(...options.nodes);
+  drawSteps();
+  library();
+}
+
+function fill(select, values, chosen) {
+  select.innerHTML = '';
+  for (const value of values) {
+    const option = document.createElement('option');
+    option.value = option.textContent = value;
+    if (value === chosen) option.selected = true;
+    select.append(option);
+  }
+}
+
+function drawSteps(state = {}) {
+  $('steps').innerHTML = '';
+  for (const name of NODES) {
+    const step = state[name];
+    const row = document.createElement('div');
+    row.className = 'step' + (step ? ' done' : '');
+    row.innerHTML =
+      `<span class="mark">${step ? '●' : '○'}</span><span>${name}</span>` +
+      `<span class="tag">${step ? (step.cached ? 'cached' : step.digest.slice(0, 8)) : ''}</span>`;
+    $('steps').append(row);
+  }
+}
+
+function stage(label) {
+  const row = document.createElement('div');
+  row.className = 'step active';
+  row.innerHTML = `<span class="mark">◐</span><span>${label}</span><span class="tag">working</span>`;
+  $('steps').append(row);
+}
+
+async function library() {
+  const { runs } = await (await fetch('/api/runs')).json();
+  $('library').innerHTML = runs.length ? '' : '<div class="placeholder">No runs yet.</div>';
+  for (const run of runs) {
+    const row = document.createElement('div');
+    row.className = 'run';
+    row.innerHTML =
+      `<span>${run.topic}<br><small>${run.scenes} scenes · ${run.duration}s · ` +
+      `${run.citations} citations · ${run.gate}</small></span>` +
+      `<small>${run.video ? 'play' : 'spec only'}</small>`;
+    if (run.video) row.onclick = () => show(run.video);
+    $('library').append(row);
+  }
+}
+
+function show(url) {
+  $('viewer').innerHTML = `<video controls autoplay src="${url}"></video>`;
+}
+
+$('go').onclick = async () => {
+  const body = {
+    topic: $('topic').value,
+    aspect: $('aspect').value,
+    voice: $('voice').value,
+    media: $('media').checked,
+    render: $('render').checked,
+    preview: $('preview').checked,
+  };
+  $('go').disabled = true;
+  $('problems').innerHTML = '';
+  $('stats').hidden = true;
+  $('viewer').innerHTML = '<div class="placeholder">Working…</div>';
+
+  const state = {};
+  drawSteps(state);
+
+  const started = await (await fetch('/api/generate', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })).json();
+
+  if (started.error) {
+    fail(started.error);
+    return;
+  }
+
+  const stream = new EventSource(`/api/events/${started.job}`);
+  stream.onmessage = (message) => {
+    const event = JSON.parse(message.data);
+    if (event.kind === 'node') { state[event.node] = event; drawSteps(state); }
+    if (event.kind === 'stage') { drawSteps(state); stage(event.label); }
+    if (event.kind === 'spec') {
+      $('stats').hidden = false;
+      $('s-scenes').textContent = event.scenes;
+      $('s-duration').textContent = event.duration;
+      $('s-citations').textContent = event.citations;
+      const gate = $('s-gate');
+      gate.textContent = event.gate;
+      gate.className = event.gate === 'passed' ? 'pass' : 'pending';
+      problems(event);
+      if (!body.render) $('viewer').innerHTML = '<div class="placeholder">Spec built — no render requested.</div>';
+    }
+    if (event.kind === 'video') show(event.url);
+    if (event.kind === 'failed') { fail(event.error); stream.close(); }
+    if (event.kind === 'done') { finish(); stream.close(); }
+  };
+  stream.onerror = () => { stream.close(); $('go').disabled = false; };
+};
+
+function problems(event) {
+  const parts = [];
+  if (event.screened?.length) {
+    parts.push('<div class="screened"><b>Safety screen dropped ' + event.screened.length +
+      ' passage(s)</b><ul>' +
+      event.screened.map((item) => `<li>[${item.category}] ${item.reason}</li>`).join('') +
+      '</ul></div>');
+  }
+  if (event.warnings?.length) {
+    parts.push('<div class="screened"><b>' + event.warnings.length + ' warning(s)</b><ul>' +
+      event.warnings.map((w) => `<li>${w}</li>`).join('') + '</ul></div>');
+  }
+  $('problems').innerHTML = parts.join('');
+}
+
+function fail(message) {
+  $('problems').innerHTML = `<div class="error">${message}</div>`;
+  $('viewer').innerHTML = '<div class="placeholder">Nothing rendered.</div>';
+  $('go').disabled = false;
+  drawSteps();
+}
+
+function finish() {
+  $('go').disabled = false;
+  drawSteps.lastState = null;
+  library();
+  document.querySelectorAll('.step.active').forEach((node) => node.remove());
+}
+
+boot();
+</script>
+</body>
+</html>
