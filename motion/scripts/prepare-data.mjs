@@ -9,7 +9,8 @@
  * part of the design.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +32,24 @@ if (tokens.id !== spec.brand.id) {
 }
 
 await mkdir(resolve(root, 'data'), { recursive: true });
+
+// Media lives in the pipeline cache as absolute paths; a browser can only load
+// what Vite serves, so stage the files under data/ and rewrite the references.
+const mediaDir = resolve(root, 'data/media');
+await mkdir(mediaDir, { recursive: true });
+let staged = 0;
+for (const scene of spec.scenes) {
+  if (!scene.media?.src) continue;
+  const name = basename(scene.media.src);
+  await copyFile(resolve(dirname(resolve(specPath)), '..', '..', scene.media.src).replace(/output\/[^/]+\/\.\.\/\.\.\//, ''), resolve(mediaDir, name)).catch(async () => {
+    await copyFile(scene.media.src, resolve(mediaDir, name));
+  });
+  scene.media.src = `/data/media/${name}`;
+  staged += 1;
+}
 await writeFile(resolve(root, 'data/spec.json'), JSON.stringify(spec, null, 2));
 await writeFile(resolve(root, 'data/brand.json'), JSON.stringify(tokens, null, 2));
-console.log(`staged ${spec.meta.slug} (${spec.scenes.length} scenes, ${spec.meta.duration_s}s) with brand ${tokens.id}`);
+console.log(
+  `staged ${spec.meta.slug} (${spec.scenes.length} scenes, ${spec.meta.duration_s}s, ` +
+    `${staged} image${staged === 1 ? '' : 's'}) with brand ${tokens.id}`,
+);

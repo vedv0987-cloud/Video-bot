@@ -67,6 +67,15 @@ def build_parser() -> argparse.ArgumentParser:
     backends.add_argument("--beats", default="fixed-tempo", choices=sorted(BEAT_SOURCES))
     backends.add_argument("--bpm", type=float, default=DEFAULT_BPM)
     backends.add_argument(
+        "--media",
+        action="store_true",
+        help=(
+            "attach licensed stills from Wikimedia Commons. Off by default: the "
+            "freely-licensed pool for health topics is largely clinical documentation, "
+            "and an irrelevant photograph is worse than a clean procedural background"
+        ),
+    )
+    backends.add_argument(
         "--offline",
         action="store_true",
         help="skip live retrieval; produces an uncited spec that cannot pass the gate",
@@ -95,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
         "aligner": args.aligner,
         "beats": args.beats,
         "bpm": args.bpm,
+        "media": args.media and not args.offline,
+        "cache_root": args.cache,
     }
     force = frozenset(name for name in args.force.split(",") if name)
 

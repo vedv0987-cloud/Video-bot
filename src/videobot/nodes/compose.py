@@ -28,6 +28,29 @@ that, moving it would fight the voice rather than serve it."""
 LAYOUTS = {"hook": "statement-center", "point": "statement-card", "cta": "end-card"}
 ROLES = {"hook": "display", "point": "headline", "cta": "body"}
 
+TRANSITION_S = 0.28
+"""Long enough to register as a move, short enough not to cost a beat."""
+
+BACKGROUNDS = ("gradient-mesh", "particle-field", "grid-lines")
+"""Cycled across claim cards so five scenes do not read as one flat look. The
+hook and the end card always take the gradient, which frames the piece."""
+
+
+def _background(section: Mapping[str, Any], index: int) -> dict[str, Any]:
+    kind = (
+        "gradient-mesh"
+        if section["kind"] != "point"
+        else BACKGROUNDS[index % len(BACKGROUNDS)]
+    )
+    return {
+        "type": kind,
+        # Deterministic per scene: the same spec always renders the same
+        # background, which is what makes renders reproducible.
+        "seed": int(digest_data(section["id"])[:6], 16),
+        "drift": 0.02,
+        "density": 1.0,
+    }
+
 
 def _round(value: float) -> float:
     return round(value + 0.0, 3)
@@ -68,8 +91,8 @@ def scene_boundaries(
 
 class ComposeNode(Node):
     name = "compose"
-    version = "4"
-    deps = ("script", "voice", "align", "beats")
+    version = "6"
+    deps = ("script", "media", "voice", "align", "beats")
     suffix = ".json"
 
     def params(self, ctx: Mapping[str, Any]) -> dict[str, Any]:
@@ -87,6 +110,7 @@ class ComposeNode(Node):
         script = inputs["script"].read_json()
         alignment = inputs["align"].read_json()
         beat_map = inputs["beats"].read_json()
+        media = inputs["media"].read_json()
 
         duration = alignment["duration_s"]
         beats = [beat for beat in beat_map["beats"] if beat <= duration]
@@ -98,8 +122,24 @@ class ComposeNode(Node):
         spoken = [section for section in script["sections"] if section["id"] in spans]
         boundaries = scene_boundaries([spans[s["id"]] for s in spoken], duration, beats)
 
+        # Word indices per section, so the renderer can drive kinetic type and
+        # captions from audio.words without re-deriving the alignment.
+        ranges: dict[str, list[int]] = {}
+        for position, word in enumerate(alignment["words"]):
+            span = ranges.setdefault(word["section"], [position, position])
+            span[1] = position
+
         scenes = [
-            self._scene(section, brand, beats, start=boundaries[index], out=boundaries[index + 1])
+            self._scene(
+                section,
+                brand,
+                beats,
+                start=boundaries[index],
+                out=boundaries[index + 1],
+                index=index,
+                words=ranges.get(section["id"], [0, 0]),
+                media=media["images"].get(section["id"]),
+            )
             for index, section in enumerate(spoken)
         ]
 
@@ -125,6 +165,8 @@ class ComposeNode(Node):
                 f"{len(script['rejected'])} passage(s) dropped by the safety screen: "
                 + ", ".join(sorted({item["category"] for item in script["rejected"]}))
             )
+        for note in media.get("notes", []):
+            notes.append(f"media: {note}")
         for failure in script.get("source_failures", []):
             notes.append(f"source {failure['source']} failed: {failure['error']}")
         if unverified:
@@ -184,6 +226,9 @@ class ComposeNode(Node):
         *,
         start: float,
         out: float,
+        index: int,
+        words: Sequence[int],
+        media: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
         element = self._element(section, brand, beats, start=start, out=out)
         return {
@@ -192,11 +237,25 @@ class ComposeNode(Node):
             "out": _round(out),
             "tier": "A",
             "layout": LAYOUTS[section["kind"]],
-            "bg": {
-                "type": "gradient-mesh",
-                "seed": int(digest_data(section["id"])[:6], 16),
-                "drift": 0.02,
+            "bg": _background(section, index),
+            "words": {"from": words[0], "to": words[1]},
+            # The opening scene has nothing to transition from.
+            "transition": {
+                "type": "cut" if index == 0 else "dip",
+                "dur": 0.0 if index == 0 else TRANSITION_S,
             },
+            "media": (
+                {
+                    "kind": "image",
+                    "src": media["src"],
+                    "credit": media["credit"],
+                    "licence": media["licence"],
+                    "page": media["page"],
+                    "treatment": media["treatment"],
+                }
+                if media
+                else None
+            ),
             "elements": [element],
         }
 

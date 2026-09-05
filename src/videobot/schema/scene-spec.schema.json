@@ -377,7 +377,9 @@
         "tier",
         "layout",
         "bg",
-        "elements"
+        "elements",
+        "words",
+        "transition"
       ],
       "additionalProperties": false,
       "properties": {
@@ -407,10 +409,27 @@
           "required": [
             "type"
           ],
+          "additionalProperties": true,
           "properties": {
             "type": {
-              "type": "string",
-              "minLength": 1
+              "enum": [
+                "gradient-mesh",
+                "particle-field",
+                "grid-lines",
+                "solid"
+              ]
+            },
+            "seed": {
+              "type": "integer"
+            },
+            "drift": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5
+            },
+            "density": {
+              "type": "number",
+              "minimum": 0
             }
           }
         },
@@ -419,6 +438,111 @@
           "items": {
             "$ref": "#/$defs/element"
           }
+        },
+        "words": {
+          "type": "object",
+          "description": "Index range into audio.words for this scene, so the renderer can drive kinetic type and captions without re-aligning.",
+          "required": [
+            "from",
+            "to"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "to": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "transition": {
+          "type": "object",
+          "required": [
+            "type",
+            "dur"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "cut",
+                "dip",
+                "push-up",
+                "wipe"
+              ]
+            },
+            "dur": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1.5
+            }
+          }
+        },
+        "media": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "kind",
+                "src",
+                "credit",
+                "licence",
+                "treatment"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "image"
+                },
+                "src": {
+                  "type": "string"
+                },
+                "credit": {
+                  "type": "string"
+                },
+                "licence": {
+                  "type": "string"
+                },
+                "page": {
+                  "type": "string"
+                },
+                "treatment": {
+                  "type": "object",
+                  "required": [
+                    "move",
+                    "scale_from",
+                    "scale_to"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "move": {
+                      "enum": [
+                        "ken-burns-in",
+                        "ken-burns-out",
+                        "pan-left",
+                        "pan-right",
+                        "hold"
+                      ]
+                    },
+                    "scale_from": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "scale_to": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },

@@ -66,13 +66,31 @@ export type Element =
   | ImageElement
   | ShapeElement;
 
+export type BackgroundKind = 'gradient-mesh' | 'particle-field' | 'grid-lines' | 'solid';
+
+export interface SceneMedia {
+  kind: 'image';
+  src: string;
+  credit: string;
+  licence: string;
+  page?: string;
+  treatment: {
+    move: 'ken-burns-in' | 'ken-burns-out' | 'pan-left' | 'pan-right' | 'hold';
+    scale_from: number;
+    scale_to: number;
+  };
+}
+
 export interface Scene {
   id: string;
   in: number;
   out: number;
   tier: Tier;
   layout: string;
-  bg: { type: string; seed?: number; drift?: number };
+  bg: { type: BackgroundKind; seed?: number; drift?: number; density?: number };
+  words: { from: number; to: number };
+  transition: { type: 'cut' | 'dip' | 'push-up' | 'wipe'; dur: number };
+  media?: SceneMedia | null;
   elements: Element[];
 }
 

@@ -52,6 +52,12 @@ const url = `http://localhost:${port}/headless.html?w=${width}&h=${height}&scale
 await page.goto(url, { waitUntil: 'load' });
 await page.waitForFunction(() => typeof window.videobotRender === 'function', null, { timeout: 30_000 });
 
+// Canvas text falls back silently. Say so loudly instead: a fallback font is
+// the difference between the house style and Helvetica.
+const family = spec.brand.id ? JSON.parse(readFileSync(resolve(root, 'data/brand.json'), 'utf8')).type.display.family : '';
+const fontOk = await page.evaluate((f) => document.fonts.check(`700 100px "${f}"`), family);
+console.log(fontOk ? `font: ${family} loaded` : `WARNING: "${family}" did not load — frames will be in a fallback face`);
+
 await mkdir(outDir, { recursive: true });
 for (const [index, seconds] of times.entries()) {
   const dataUrl = await page.evaluate((t) => window.videobotRender(t), seconds);

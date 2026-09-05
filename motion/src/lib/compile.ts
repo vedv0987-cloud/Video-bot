@@ -9,13 +9,16 @@
 
 import { resolveEase } from './easing';
 import type {
+  BackgroundKind,
   BrandTokens,
   Element,
   Role,
   Scene,
+  SceneMedia,
   SceneSpec,
   Transition,
   TypeStyle,
+  Word,
 } from './spec';
 
 export class CompileError extends Error {}
@@ -93,7 +96,11 @@ export interface PlannedScene {
   out: number;
   duration: number;
   layout: string;
-  bg: Scene['bg'];
+  bg: { type: BackgroundKind; seed?: number; drift?: number; density?: number };
+  transition: Scene['transition'];
+  media: SceneMedia | null;
+  /** Words spoken during this scene, already sliced and scene-relative. */
+  words: Word[];
   elements: PlannedElement[];
 }
 
@@ -109,6 +116,16 @@ export interface RenderPlan {
   safe: { top: number; right: number; bottom: number; left: number };
   margin: { x: number; y: number };
   radius: number;
+  accent: string;
+  accentAlt: string;
+  inkMuted: string;
+  captions: {
+    maxWords: number;
+    activeColor: string;
+    idleColor: string;
+    outlinePx: number;
+    style: TypeStyle;
+  };
   scenes: PlannedScene[];
 }
 
@@ -243,6 +260,16 @@ export function compile(spec: SceneSpec, tokens: BrandTokens): RenderPlan {
     },
     margin: { x: tokens.space.margin_x, y: tokens.space.margin_y },
     radius: tokens.space.radius,
+    accent: colorToken(tokens, 'accent'),
+    accentAlt: typeof tokens.color.accent_alt === 'string' ? tokens.color.accent_alt : colorToken(tokens, 'accent'),
+    inkMuted: colorToken(tokens, 'ink_muted'),
+    captions: {
+      maxWords: tokens.captions.max_words,
+      activeColor: tokens.captions.active_color,
+      idleColor: tokens.captions.idle_color,
+      outlinePx: tokens.captions.outline_px ?? 0,
+      style: tokens.type.caption,
+    },
     scenes: spec.scenes.map((scene) => ({
       id: scene.id,
       in: scene.in,
@@ -250,6 +277,17 @@ export function compile(spec: SceneSpec, tokens: BrandTokens): RenderPlan {
       duration: +(scene.out - scene.in).toFixed(3),
       layout: scene.layout,
       bg: scene.bg,
+      transition: scene.transition,
+      media: scene.media ?? null,
+      // Sliced here so components never index into global state, and shifted
+      // to scene-relative time so a component never needs the scene's offset.
+      words: spec.audio.words
+        .slice(scene.words.from, scene.words.to + 1)
+        .map((word) => ({
+          w: word.w,
+          t0: +(word.t0 - scene.in).toFixed(3),
+          t1: +(word.t1 - scene.in).toFixed(3),
+        })),
       elements: scene.elements.map((element) => compileElement(element, scene, tokens)),
     })),
   };

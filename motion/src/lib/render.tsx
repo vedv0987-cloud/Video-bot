@@ -2,25 +2,35 @@
  * The interpreter: a render plan becomes a scene graph.
  *
  * Deliberately thin. Everything that decides how the piece *looks* lives in the
- * compiler and the components; this only wires them to the timeline.
+ * compiler, the backgrounds and the components; this only wires them to the
+ * timeline and stacks them in the right order.
+ *
+ * Layer order, back to front:
+ *
+ *   background   procedural system, always moving
+ *   media        licensed still under a slow move, when the spec carries one
+ *   scrim        darkens whatever is beneath so type stays legible
+ *   content      the cards
+ *   vignette     pulls the eye to the middle
  */
 
-import { Gradient, Rect, type View2D } from '@motion-canvas/2d';
-import { all, waitFor, type ThreadGenerator } from '@motion-canvas/core';
+import { Gradient, Img, Layout, Rect, Txt, type View2D } from '@motion-canvas/2d';
+import { all, chain, waitFor, type ThreadGenerator } from '@motion-canvas/core';
 
+import { buildBackground } from './backgrounds';
 import { resolveEase } from './easing';
+import { vignette } from './overlay';
 import type { PlannedElement, PlannedScene, RenderPlan } from './compile';
 import {
   endCard,
+  kineticText,
   listReveal,
   lowerThird,
   statCounter,
-  statementCard,
   type BuildContext,
   type BuiltElement,
 } from '../components';
 
-/** Layouts whose text is treated as a closing card rather than a statement. */
 const END_LAYOUTS = new Set(['end-card']);
 const LOWER_THIRD_LAYOUTS = new Set(['lower-third']);
 
@@ -36,7 +46,9 @@ export function chooseComponent(
     case 'text':
       if (END_LAYOUTS.has(layout)) return endCard;
       if (LOWER_THIRD_LAYOUTS.has(layout)) return lowerThird;
-      return statementCard;
+      // Everything else gets word-synced type; it falls back to a block
+      // reveal on its own when the alignment does not match.
+      return kineticText;
     default:
       throw new Error(
         `no component for element kind "${element.payload.kind}" in layout "${layout}"`,
@@ -44,36 +56,75 @@ export function chooseComponent(
   }
 }
 
-function background(plan: RenderPlan, scene: PlannedScene): Rect {
-  const stops = plan.gradient.map((color, index) => ({
-    offset: plan.gradient.length === 1 ? index : index / (plan.gradient.length - 1),
-    color,
-  }));
+/** A still under a slow move. A static photograph in a moving cut reads as a stall. */
+function mediaLayer(plan: RenderPlan, scene: PlannedScene): { node: Img; move: ThreadGenerator } | null {
+  if (!scene.media) return null;
+  const { treatment } = scene.media;
 
-  return new Rect({
-    width: plan.width * 1.2,
-    height: plan.height * 1.2,
-    fill:
-      scene.bg.type === 'solid'
-        ? plan.background
-        : new Gradient({
-            type: 'linear',
-            from: [0, -plan.height / 2],
-            to: [0, plan.height / 2],
-            stops,
-          }),
+  const node = new Img({
+    src: scene.media.src,
+    width: plan.width,
+    height: plan.height,
+    scale: treatment.scale_from,
   });
+
+  const drift = plan.width * 0.05;
+  const target: [number, number] =
+    treatment.move === 'pan-left'
+      ? [-drift, 0]
+      : treatment.move === 'pan-right'
+        ? [drift, 0]
+        : [0, 0];
+
+  return {
+    node,
+    move: all(
+      node.scale(treatment.scale_to, scene.duration, resolveEase('sine.inOut')),
+      node.position(target, scene.duration, resolveEase('sine.inOut')),
+    ),
+  };
 }
 
 /**
- * A slow, continuous drift on the background.
+ * On-screen attribution.
  *
- * A perfectly static ground is the other tell of generated video: real footage
- * always breathes. The amount is deliberately below conscious notice.
+ * CC BY and CC BY-SA *require* credit. Putting it in a description that may or
+ * may not travel with the file is not compliance; putting it in the frame is.
+ * Small and low-contrast so it reads as a caption, not as content.
  */
-function* drift(node: Rect, scene: PlannedScene): ThreadGenerator {
-  const amount = 1 + (scene.bg.drift ?? 0.02);
-  yield* node.scale(amount, scene.duration, resolveEase('sine.inOut'));
+function credit(plan: RenderPlan, scene: PlannedScene): Txt | null {
+  if (!scene.media) return null;
+  const style = plan.captions.style;
+  return new Txt({
+    text: scene.media.credit,
+    fontFamily: [style.family, ...(style.fallback ?? [])].join(', '),
+    fontWeight: 500,
+    fontSize: style.size * 0.3,
+    fill: plan.inkMuted,
+    opacity: 0.65,
+    // Just inside the bottom safe inset, where platform chrome will not sit.
+    y: plan.height / 2 - plan.safe.bottom + style.size * 0.55,
+  });
+}
+
+/** Keeps type legible over imagery without flattening the picture. */
+function scrim(plan: RenderPlan): Rect {
+  return new Rect({
+    width: plan.width,
+    height: plan.height,
+    fill: new Gradient({
+      type: 'linear',
+      from: [0, -plan.height / 2],
+      to: [0, plan.height / 2],
+      // Heavy on purpose. A still is there to give the frame depth, not to
+      // compete with the sentence the viewer is reading.
+      stops: [
+        { offset: 0, color: `${plan.background}f2` },
+        { offset: 0.45, color: `${plan.background}cc` },
+        { offset: 1, color: `${plan.background}fa` },
+      ],
+    }),
+  });
 }
 
 export function* renderScene(
@@ -86,17 +137,50 @@ export function* renderScene(
   // the frame's true centre.
   const centreY = (plan.safe.top - plan.safe.bottom) / 2;
 
-  const bg = background(plan, scene);
-  view.add(bg);
+  const root = new Layout({});
+  view.add(root);
+
+  const background = buildBackground(plan, scene);
+  root.add(background.node);
+
+  const media = mediaLayer(plan, scene);
+  if (media) {
+    root.add(media.node);
+    root.add(scrim(plan));
+  }
 
   const built = scene.elements.map((element) =>
-    chooseComponent(scene.layout, element)({ element, plan, contentWidth, centreY }),
+    chooseComponent(scene.layout, element)({
+      element,
+      plan,
+      contentWidth,
+      centreY,
+      words: scene.words,
+    }),
   );
-  built.forEach((item) => view.add(item.node));
+  built.forEach((item) => root.add(item.node));
+  root.add(vignette(plan));
+
+  const attribution = credit(plan, scene);
+  if (attribution) root.add(attribution);
+
+  // The dip runs alongside the content rather than before it, so a transition
+  // costs no screen time — the cards are already leading in by more than this.
+  const dip = scene.transition.type === 'dip' ? scene.transition.dur : 0;
+  const ease = resolveEase('sine.inOut');
+  if (dip > 0) root.opacity(0);
 
   yield* all(
-    drift(bg, scene),
+    background.animate(),
+    media?.move ?? waitFor(0),
     ...built.map((item) => item.timeline(scene.in)),
+    dip > 0
+      ? chain(
+          root.opacity(1, dip, ease),
+          waitFor(Math.max(0, scene.duration - dip * 2)),
+          root.opacity(0, dip, ease),
+        )
+      : waitFor(0),
     waitFor(scene.duration),
   );
 }
