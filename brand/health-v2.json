@@ -24,7 +24,7 @@
         "sans-serif"
       ],
       "weight": 800,
-      "size": 148,
+      "size": 340,
       "tracking": -0.022,
       "leading": 1.02
     },
@@ -36,7 +36,7 @@
         "sans-serif"
       ],
       "weight": 700,
-      "size": 96,
+      "size": 232,
       "tracking": -0.015,
       "leading": 1.12
     },
@@ -48,7 +48,7 @@
         "sans-serif"
       ],
       "weight": 500,
-      "size": 62,
+      "size": 150,
       "tracking": -0.005,
       "leading": 1.32
     },
@@ -60,7 +60,7 @@
         "sans-serif"
       ],
       "weight": 800,
-      "size": 84,
+      "size": 116,
       "tracking": -0.01,
       "leading": 1.15
     }
