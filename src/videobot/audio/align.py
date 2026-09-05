@@ -80,16 +80,21 @@ class EstimatedAligner:
 
 
 class WhisperXAligner:
-    """wav2vec2 forced alignment — sub-100ms word boundaries."""
+    """wav2vec2 forced alignment — sub-100ms word boundaries.
+
+    Declared, not written. Forced alignment needs the voiceover itself, and
+    this interface is handed only the sections and a duration; closing that
+    gap is the first half of the job, not an afterthought to it.
+    """
 
     method = "whisperx"
 
     def align(self, sections: Sequence[dict], duration_s: float) -> AlignResult:
-        from .speech import BackendUnavailable
+        from .speech import BackendNotImplemented
 
-        raise BackendUnavailable(
-            "aligner 'whisperx' is not installed in this environment. "
-            "Install it with: pip install whisperx"
+        raise BackendNotImplemented(
+            "aligner 'whisperx' has no implementation yet — the aligner interface does not "
+            "receive the voiceover path that forced alignment needs. Use --aligner estimated."
         )
 
 

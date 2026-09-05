@@ -4,7 +4,16 @@ import pytest
 
 from videobot.audio.align import EstimatedAligner, WhisperXAligner, get_aligner
 from videobot.audio.beats import FixedTempoBeats, LibrosaBeats, get_beat_source
-from videobot.audio.speech import BackendUnavailable, NullSpeech, get_speech_backend, wav_duration
+from videobot.audio.speech import (
+    BackendNotImplemented,
+    BackendUnavailable,
+    KokoroSpeech,
+    NullSpeech,
+    chunk_text,
+    get_speech_backend,
+    pcm16,
+    wav_duration,
+)
 
 SECTIONS = [
     {"id": "hook", "text": "Here is what the evidence says.", "items": []},
@@ -28,11 +37,80 @@ def test_null_speech_is_never_zero_length():
     assert NullSpeech().estimate_duration("hi") >= 1.0
 
 
-@pytest.mark.parametrize("name", ["kokoro", "chatterbox"])
-def test_real_backends_fail_with_an_install_hint(name):
+def test_kokoro_says_how_to_install_itself_when_missing():
     """A missing model must say how to get it, not raise ImportError."""
+    try:
+        import kokoro  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        pytest.skip("kokoro is installed here, so there is no missing-install path to take")
+
     with pytest.raises(BackendUnavailable, match="Install it with"):
-        get_speech_backend(name).synthesize("hello")
+        KokoroSpeech().synthesize("hello")
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: get_speech_backend("chatterbox").synthesize("hello"),
+        lambda: WhisperXAligner().align(SECTIONS, 10.0),
+        lambda: LibrosaBeats().beats(10.0),
+    ],
+    ids=["chatterbox", "whisperx", "librosa"],
+)
+def test_unwritten_backends_say_so_instead_of_blaming_the_install(call):
+    """Telling someone to pip install code that was never written wastes a day."""
+    with pytest.raises(BackendNotImplemented) as caught:
+        call()
+
+    assert "no implementation yet" in str(caught.value)
+    assert "Install it with" not in str(caught.value)
+
+
+# --- kokoro, without the model -------------------------------------------
+
+
+def test_chunking_keeps_sentences_whole_and_under_the_ceiling():
+    text = " ".join(f"Sentence number {n} says something about water." for n in range(20))
+    chunks = chunk_text(text, limit=120)
+
+    assert all(len(chunk) <= 120 for chunk in chunks)
+    assert " ".join(chunks) == text
+
+
+def test_chunking_is_a_pure_function_of_the_text():
+    """The voice artifact is cached by digest — chunking must not drift."""
+    text = "One. Two. Three."
+    assert chunk_text(text) == chunk_text(text)
+
+
+def test_an_overlong_sentence_breaks_at_a_clause_not_mid_word():
+    text = "water matters a great deal, and thirst arrives late, so drink early in the day"
+    chunks = chunk_text(text, limit=40)
+
+    assert all(chunk in text for chunk in chunks)
+    assert chunks[0].endswith("deal,")
+
+
+def test_pcm16_clips_instead_of_wrapping_around():
+    """A sample over full scale must saturate; wrapping is an audible click."""
+    assert pcm16([2.0, -2.0]) == pcm16([1.0, -1.0])
+    assert len(pcm16([0.0] * 5)) == 10
+
+
+def test_pcm16_accepts_anything_array_like():
+    class Tensor:
+        def tolist(self):
+            return [0.5]
+
+    assert pcm16(Tensor()) == pcm16([0.5])
+
+
+def test_kokoro_records_its_voice_and_seed_in_the_model_id():
+    """Both change the audio, so both belong in the cache key."""
+    assert KokoroSpeech(voice="af_bella", seed=7).model == "kokoro-82M:af_bella@7"
+    assert KokoroSpeech().model != KokoroSpeech(seed=1).model
 
 
 def test_unknown_speech_backend_is_rejected():
@@ -69,11 +147,6 @@ def test_alignment_of_nothing_is_empty():
     assert EstimatedAligner().align([], 5.0).words == []
 
 
-def test_whisperx_is_not_installed_here():
-    with pytest.raises(BackendUnavailable, match="whisperx"):
-        WhisperXAligner().align(SECTIONS, 10.0)
-
-
 def test_unknown_aligner_is_rejected():
     with pytest.raises(KeyError, match="unknown aligner"):
         get_aligner("nope")
@@ -90,11 +163,6 @@ def test_fixed_tempo_lays_an_even_grid():
 
 def test_beats_stay_inside_the_track():
     assert FixedTempoBeats(92).beats(10.0).beats[-1] <= 10.0
-
-
-def test_librosa_is_not_installed_here():
-    with pytest.raises(BackendUnavailable, match="librosa"):
-        LibrosaBeats().beats(10.0)
 
 
 def test_unknown_beat_source_is_rejected():

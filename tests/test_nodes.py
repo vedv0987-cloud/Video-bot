@@ -14,7 +14,7 @@ from videobot.nodes.script import (
     assert_no_invented_claims,
 )
 from videobot.sources.base import Evidence, SourceSet
-from tests.test_pipeline import BRAND_PATH
+from conftest import BRAND_PATH
 
 CLAIMS = [
     {"id": "c1", "text": "About 60% of the adult body is water.", "display": True},

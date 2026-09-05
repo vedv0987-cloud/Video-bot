@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 from typing import Any
 
 import pytest
+
+BRAND_PATH = str(Path(__file__).resolve().parents[1] / "brand" / "health-v2.json")
+"""The repo's own brand tokens.
+
+Lives here rather than in a test module because conftest is loaded by pytest
+itself — importing it across test files requires `tests` to be an importable
+package, which only holds when pytest is invoked as `python -m pytest`.
+"""
 
 _MINIMAL: dict[str, Any] = {
     "version": "1.0",

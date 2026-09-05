@@ -51,9 +51,11 @@ videobot --topic "dehydration"        # live retrieval
 videobot --topic "x" --offline        # no network; cannot pass the gate
 ```
 
-Retrieval is live (Wikipedia + PubMed). Voice, alignment, beats and the rewriter sit
-behind interfaces with deterministic offline defaults; real backends are selected with
-`--voice kokoro|chatterbox`, `--aligner whisperx`, `--beats librosa`, `--rewriter qwen3`.
+Retrieval is live (Wikipedia + PubMed). **`--voice kokoro` is real**: Kokoro-82M
+synthesises the voiceover at 24 kHz, seeded so the wav is a pure function of the script.
+Alignment, beats and the rewriter still sit behind interfaces with deterministic offline
+defaults. `chatterbox`, `whisperx` and `librosa` are *declared but unwritten* — they now
+say so (`BackendNotImplemented`) rather than blaming the install.
 
 The **motion layer** lives in `motion/` (Motion Canvas, MIT). `motion/src/lib/compile.ts`
 turns a spec into an engine-independent render plan; `render.tsx` interprets it;
@@ -127,6 +129,18 @@ Each of these was a real bug found by running the thing, not by reading it.
   default visual language. Do not flip this without looking at what comes back.
 - **Playwright bundles a minimal ffmpeg with no libx264.** It fails at the encode, after
   every frame has been rendered. `render.mjs` verifies the codec before starting.
+- **Kokoro is not deterministic out of the box.** Two runs of the same sentence differed
+  across 78% of their samples, by up to 9% of full scale. Unseeded it rewrites the voice
+  artifact every run and invalidates align, beats and compose behind it —
+  `KOKORO_SEED` is what makes invariant 1 hold for a neural voice. Seed per chunk, not
+  per call, so re-chunking leaves untouched chunks byte-identical.
+- **An unimplemented backend told you to `pip install` it.** `--voice kokoro` failed with
+  "not installed in this environment" on a machine where Kokoro *was* installed, because
+  the backend was a stub wearing an install hint. Backends that were never written now
+  raise `BackendNotImplemented` and name the reason.
+- **The suite only passed under `python -m pytest`.** `tests/test_nodes.py` imported
+  `BRAND_PATH` across test modules, which needs `tests` to be importable — true only when
+  CWD is on `sys.path`. Shared test constants belong in `conftest.py`.
 - **`cd` persists between Bash calls.** Several patch scripts silently wrote nothing
   because the working directory was `motion/`. Use absolute paths.
 
