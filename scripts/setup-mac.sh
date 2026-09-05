@@ -107,6 +107,7 @@ fi
 say "Done"
 cat <<EOF
   Listen to the voiceover:   afplay \$(ls -t "$REPO"/.cache/voice/*.wav | head -1)
+  Run one more topic:        "$VENV/bin/videobot" --topic "sleep" --voice kokoro
   Work in the venv:          source "$VENV/bin/activate"
 
   Make the shortcut permanent (an \`alias\` typed at a prompt dies with the window):
