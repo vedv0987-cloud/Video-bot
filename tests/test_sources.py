@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from videobot import http
+from videobot.http import FetchError
 from videobot.safety import is_citable, screen
 from videobot.sources.base import Evidence, SourceSet
 from videobot.sources.pubmed import PubMedSource, _identity
@@ -43,6 +44,90 @@ def test_wikipedia_pins_the_revision(monkeypatch):
     assert all(e.source_id == "wikipedia:Dehydration@1372280572" for e in evidence)
     assert all("oldid=1372280572" in e.url for e in evidence)
     assert all(is_citable(e.source_id) for e in evidence)
+
+
+DISAMBIGUATION = {"type": "disambiguation", "title": "Hydration", "revision": "9", "extract": "Hydration may refer to:Hydrate, a substance that contains water Dough hydration, the percentage of water in a dough in relation to the amount of flour"}
+
+BODY_WATER = {
+    "type": "standard",
+    "title": "Body water",
+    "revision": "1300000001",
+    "extract": (
+        "In physiology, body water is the water content of an animal body. "
+        "The percentages contained in various fluid compartments add up to total body water."
+    ),
+    "content_urls": {"desktop": {"page": "https://en.wikipedia.org/wiki/Body_water"}},
+}
+
+
+def _routed(pages, summaries):
+    """Fake get_json that answers search and summary calls from fixtures."""
+
+    def get_json(url, params=None):
+        if url.startswith("https://en.wikipedia.org/w/rest.php"):
+            return {"pages": pages}
+        key = url.rsplit("/", 1)[-1]
+        return summaries[key]
+
+    return get_json
+
+
+def test_a_disambiguation_page_never_becomes_evidence(monkeypatch):
+    """The bread-dough bug: every sense of a word, each one citable.
+
+    "Hydration may refer to: … Dough hydration, the percentage of water in a
+    dough" sentence-splits into claims that trace to a real revision and are
+    about the wrong subject entirely.
+    """
+    monkeypatch.setattr(
+        "videobot.sources.wikipedia.get_json",
+        _routed(
+            [{"key": "Body_water"}],
+            {"hydration": DISAMBIGUATION, "Body_water": BODY_WATER},
+        ),
+    )
+    evidence = WikipediaSource().fetch("hydration", 5)
+
+    assert [e.title for e in evidence] == ["Body water", "Body water"]
+    assert not any("dough" in e.text.lower() for e in evidence)
+    assert all(e.source_id == "wikipedia:Body water@1300000001" for e in evidence)
+
+
+def test_resolution_skips_a_candidate_that_is_itself_ambiguous(monkeypatch):
+    monkeypatch.setattr(
+        "videobot.sources.wikipedia.get_json",
+        _routed(
+            [{"key": "CHI"}, {"key": "Body_water"}],
+            {"hydration": DISAMBIGUATION, "CHI": DISAMBIGUATION, "Body_water": BODY_WATER},
+        ),
+    )
+    assert WikipediaSource().fetch("hydration", 5)[0].title == "Body water"
+
+
+def test_an_article_named_for_the_topic_outranks_search_order(monkeypatch):
+    """Search puts Human_body_temperature above Sleep for "sleep human body health"."""
+    sleep = dict(BODY_WATER, title="Sleep")
+    monkeypatch.setattr(
+        "videobot.sources.wikipedia.get_json",
+        _routed(
+            [{"key": "Human_body_temperature"}, {"key": "Sleep"}],
+            {"sleep": DISAMBIGUATION, "Sleep": sleep, "Human_body_temperature": BODY_WATER},
+        ),
+    )
+    assert WikipediaSource().fetch("sleep", 5)[0].title == "Sleep"
+
+
+def test_an_unresolvable_topic_is_recorded_not_swallowed(monkeypatch):
+    """Invariant 7 — a degraded run must be visible, so this raises for gather."""
+    monkeypatch.setattr(
+        "videobot.sources.wikipedia.get_json",
+        _routed([], {"hydration": DISAMBIGUATION}),
+    )
+    with pytest.raises(FetchError, match="disambiguation"):
+        WikipediaSource().fetch("hydration", 5)
+
+    failures = SourceSet((WikipediaSource(),)).gather("hydration", 5).failures
+    assert failures and "disambiguation" in failures[0]["error"]
 
 
 def test_wikipedia_without_a_revision_yields_nothing(monkeypatch):
