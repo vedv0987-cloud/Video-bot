@@ -28,8 +28,16 @@ or algorithmic has failed, however correct its content.
 
 ## Current state
 
-**Phases 1–3 are complete and merged; the pipeline renders an MP4.** 118 Python
-tests and 18 TypeScript tests pass.
+**Phases 1–3 of the pipeline are complete; it renders an MP4.** The studio build
+(`docs/MASTER-PLAN.md`) is now underway — Phase 0 has begun. 118 Python tests,
+18 motion tests, 14 hardware tests.
+
+Decisions settled: **Remotion** as the motion engine · **Gemini 3 Flash free tier**
+for the LLM, with Ollama fallback (**never enable billing on that Google Cloud
+project — it deletes the free tier**) · **generative video removed from scope**,
+footage and graphics only · platform reviews submitted at Phase 6, since both
+require a working demo · Phase 2 target topic is "How Nuclear Fusion Could Change
+the Future".
 
 ```
 research ──▶ script ──▶ voice ─┬─▶ align ─┐
@@ -139,6 +147,8 @@ Each of these was a real bug found by running the thing, not by reading it.
 - Schemas live in `src/videobot/schema/` as package data so they resolve from any cwd.
 - The motion layer has its own suite: `cd motion && npm test` (pure compiler logic, no
   browser) and `npm run typecheck`. Run both before pushing anything under `motion/`.
+- Node workspaces live at the repo root: `npm run hardware` measures the machine and
+  prints the render budget. Run it on the target Mac before trusting any render default.
 
 ---
 

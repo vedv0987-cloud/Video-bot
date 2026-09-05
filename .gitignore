@@ -11,8 +11,11 @@ venv/
 .cache/
 output/
 
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Motion layer
-motion/node_modules/
-motion/dist/
 motion/data/
 motion/.frames/

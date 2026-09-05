@@ -48,14 +48,15 @@ engine.
    `scheduled_publish_time` on the Reels publish call. "Scheduling" must be our own
    scheduler waking at the target time and firing the publish. Plus a 2–4 week app
    review per permission, and a Business/Creator account linked to a Facebook Page.
-4. **Veo 3.1 has no free API tier, and your consumer Google AI Pro subscription is not
-   API access.** Programmatic generation is paid from the first clip: roughly
-   **$0.64–0.96 per 8-second 1080p clip**. A 6-minute video that is 20% generated
-   footage is ~72s of Veo ≈ 9 clips ≈ **$6–9 per render**. That is a per-video unit
-   cost, and it must be surfaced in the UI before generation, not after.
-5. **Local generative video is out on this machine.** Measured community results on
-   Apple Silicon: ~82 minutes for a 2-second clip on an M1 Max/64 GB, LTX-2 fp8 failing
-   on Metal. Generated footage means the Veo API or rented NVIDIA — not the Air.
+4. **Generative video is out of scope, by decision.** It was researched and rejected:
+   Veo 3.1 has no free API tier (~$0.64–0.96 per 8-second 1080p clip, so ~$6–9 for a
+   six-minute video at 20% generated footage), consumer Google AI Pro is not API access,
+   and local generation on Apple Silicon is not viable — measured community results show
+   ~82 minutes for a 2-second clip on an M1 Max/64 GB and LTX-2 fp8 failing on Metal.
+   **Footage and motion graphics are the only visual sources.**
+5. **That makes the Asset Acquisition Engine load-bearing.** With no generated fallback,
+   ranking real footage well (§10) and choosing graphics over footage intelligently (§9)
+   *are* the visual quality of the product.
 
 ---
 
@@ -327,7 +328,6 @@ to a halt.
 | Asset search | visual intents | ranked candidates | Pexels → Pixabay → Commons → Archive | yes | yes |
 | Asset download | candidates | files + metadata + proxies | undici + sharp + ffmpeg | yes | yes (sha256 + phash) |
 | Clip selection | assets, scene | `{asset, start, end}` | heuristic + optional CLIP scoring | yes | yes |
-| Generative video | prompts | clips | Veo 3.1 via Gemini API | yes | yes (**paid**) |
 | Voice | script | WAV + timings | Kokoro / Chatterbox / external | yes | yes |
 | Alignment | WAV + text | word timings | WhisperX / mlx-whisper | yes | yes |
 | Music | mood, duration | track + licence | Pixabay Music → local library → ACE-Step | yes | yes |
@@ -407,8 +407,7 @@ at render time.
 ### Provider chain and fallback
 
 ```
-Pexels → Pixabay → Wikimedia Commons → Internet Archive → generated (Veo) →
-motion graphic
+Pexels → Pixabay → Wikimedia Commons → Internet Archive → motion graphic
 ```
 
 A missing clip must never fail a project. The last link in that chain always succeeds.
@@ -811,9 +810,9 @@ and nothing reported it.
 | Database | **SQLite + Drizzle** | Postgres, Prisma | MIT/Apache | Free | Local | No daemon, real migrations, right size for one desktop user |
 | Job queue | **In-process, SQLite-backed** | BullMQ + Redis | MIT | Free | Local | A broker is operational weight with no benefit on a desktop |
 | Content layer | **Existing Python** | Port to TS | — | Free | Local | 118 tests, live retrieval, safety gate — reuse, don't rewrite |
-| Research LLM | **Provider abstraction; API default** | Local Qwen3 8B | varies | ~$0.02–0.15/video | Cloud (local fallback) | 16 GB cannot hold a model good enough for 6-minute documentary prose alongside a render |
+| Research LLM | **Gemini 3 Flash, free tier** | Ollama + Qwen3 8B, Groq | — | **Free** (1,500 req/day) | Cloud (local fallback) | 16 GB cannot hold a model good enough for 6-minute documentary prose alongside a render. Never enable billing on the project |
 | Footage | **Pexels → Pixabay → Commons → Archive** | single provider | permissive | Free | Cloud | Fallback chain; one dead provider must not fail a project |
-| Generative video | **Veo 3.1 via Gemini API** | rented NVIDIA + Wan 2.2 | commercial | **$0.64–0.96 / 8s 1080p** | Cloud | No local option on an Air. Surface cost before generating |
+| Generative video | **none — disabled by decision** | Veo 3.1 via Gemini API | — | — | — | Removed: footage and graphics only. Interface kept, unimplemented |
 | Images | **Imagen via Gemini API** | FLUX.2 klein (Apache-2.0) on rented GPU | commercial | per image | Cloud | Thumbnails and conceptual plates |
 | TTS | **Kokoro (draft) + Chatterbox (final)** | Piper, external APIs | Apache-2.0 / MIT | Free | Local | Already abstracted; CPU-viable on Apple Silicon |
 | Alignment | **WhisperX** | mlx-whisper, aeneas | BSD-ish | Free | Local | Forced alignment, sub-100ms word boundaries |
@@ -858,7 +857,6 @@ and nothing reported it.
 | Editor | | ✅ | | high |
 | Versioning | | ✅ | | medium |
 | Multi-aspect | | ✅ | | high |
-| Generative video (Veo) | | ✅ | | medium |
 | Thumbnails | | ✅ | | medium |
 | Metadata generation | | ✅ | | low |
 | YouTube publishing | | | ✅ | high |
@@ -877,12 +875,11 @@ and nothing reported it.
 | Stock video | Pixabay | yes | yes | Commons |
 | Archival media | Wikimedia Commons | yes | yes | Internet Archive |
 | Archival media | Internet Archive | yes | yes | motion graphic |
-| Generative video | Veo 3.1 (Gemini API) | yes | yes | rented NVIDIA + Wan 2.2 → motion graphic |
-| Generative video | Google Flow (consumer) | **no** | consumer UI only | not automatable — manual import only |
+| Generative video | *disabled by decision* | — | — | motion graphic |
 | Images | Imagen (Gemini API) | yes | yes | frame + typography template |
 | Research | Wikipedia REST, PubMed | yes | yes | — |
 | Research (general) | Tavily / Brave Search | yes | yes | Wikipedia only |
-| Script LLM | Anthropic / Gemini API | yes | yes | Ollama + Qwen3 8B local |
+| Script LLM | **Gemini 3 Flash (free tier)** | yes | yes | Ollama + Qwen3 8B local → Groq |
 | TTS | Kokoro, Chatterbox | local | OSS | external TTS adapter |
 | Alignment | WhisperX | local | OSS | estimated (marked in provenance) |
 | Music | Pixabay Music | yes | yes | local library → ACE-Step |
@@ -894,9 +891,8 @@ and nothing reported it.
 
 | Risk | Severity | Probability | Mitigation |
 | --- | --- | --- | --- |
-| YouTube audit not granted → cannot publish public | **High** | Medium | Apply early, before Phase 3. UI shows verification state. Manual-export path always available |
+| YouTube audit not granted → cannot publish public | **High** | Medium | Ship "upload as private draft", which needs no audit. UI shows verification state. Submit the audit at Phase 6 with a real demo |
 | Instagram app review rejected or slow | **High** | Medium-High | Start review in Phase 3 planning. Export + manual post as the honest fallback |
-| Veo per-video cost surprises you | Medium | **High** | Show projected cost before generation; hard per-project cap; generated footage off by default |
 | Remotion licence trigger if you hire | Medium | Low | Documented; $25/seat is small next to the alternative of a rewrite |
 | Render OOM on 16 GB | Medium | Medium | Per-scene rendering, memory floor check, concurrency from benchmark, proxies for preview |
 | Thermal throttling distorts benchmarks | Low | **High** | Benchmark three consecutive runs; use the third |
@@ -944,8 +940,9 @@ Editor, scene recreate, footage replace, versioning, thumbnails, metadata.
 
 ### Phase 6 — publishing (≈2 weeks, plus external review time)
 YouTube OAuth + upload + thumbnail, Instagram container flow, publish queue, our own
-scheduler, connected-accounts UI. **Start the YouTube audit and Meta app review at the
-beginning of Phase 3**, not here — they are the long poles.
+scheduler, connected-accounts UI. **Submit the YouTube audit and Meta app review at the start of this phase**, once there
+is a working OAuth flow to screencast. Until they clear, YouTube uploads land as private
+drafts — useful on its own and requiring no approval.
 
 ### Phase 7 — optimisation and hardening (≈1.5 weeks)
 Benchmark matrix, defaults from measurement, render recovery, offline resume, disk
@@ -962,9 +959,9 @@ that stopping after any of them leaves something usable.
 1. **You cannot publish public YouTube videos until Google audits the API project.**
 2. **Instagram cannot schedule Reels via API.** Our scheduler fires at the target time;
    the machine must be awake and online.
-3. **Generated video costs real money per clip** and cannot run locally on this machine.
-4. **Google Flow consumer access is not API access.** Flow output can be imported
-   manually as an asset; it cannot be automated.
+3. **No generated video.** Disabled by decision; footage and graphics only.
+4. **Gemini's free tier disappears the moment billing is enabled** on that Google Cloud
+   project.
 5. **Footage relevance is the quality ceiling for stock-driven scenes.** Ranking helps;
    it does not make a perfect clip exist. This is why graphics are first-class.
 6. **Analytics are limited to what the platforms expose.** Watch time and audience
@@ -980,9 +977,9 @@ that stopping after any of them leaves something usable.
 
 ```
 # LLM
-ANTHROPIC_API_KEY=            # or
-GEMINI_API_KEY=
-LLM_PROVIDER=anthropic|gemini|ollama
+GEMINI_API_KEY=               # free tier — https://aistudio.google.com/apikey
+GROQ_API_KEY=                 # optional fallback
+LLM_PROVIDER=gemini|ollama|groq   # gemini free tier: never enable billing on the project
 OLLAMA_HOST=http://127.0.0.1:11434
 
 # Media providers
@@ -995,7 +992,6 @@ TAVILY_API_KEY=               # optional, general-topic research
 # Generative (paid — leave unset to disable)
 GEMINI_VIDEO_MODEL=veo-3.1-fast-generate-preview
 GEMINI_IMAGE_MODEL=
-VEO_MONTHLY_BUDGET_USD=25     # hard cap; generation refuses past it
 
 # Publishing (OAuth client config; tokens live in the keychain)
 YOUTUBE_CLIENT_ID=
@@ -1013,16 +1009,58 @@ No secret is ever read by the Next.js client. The server is the only holder.
 
 ---
 
-## 28. What I need from you before implementation
+## 28. Decisions — settled
 
-1. **Remotion, or stay on Motion Canvas?** My recommendation is Remotion, for the
-   player. It is your licence exposure if the studio ever exceeds three people.
-2. **LLM provider.** An API model will write markedly better 6-minute documentary
-   narration than anything that fits in 16 GB alongside a render. Which key do you
-   want to use?
-3. **Veo budget.** Off, or a monthly cap? I would start off, and turn it on for
-   specific scenes once the rest is good.
-4. **Start the YouTube audit and Meta app review now?** They are the longest external
-   dependencies and they gate Phase 6 regardless of how fast the code goes.
-5. **First real topic.** Phase 2's exit criterion should be a video you actually want,
-   not "dehydration" again.
+| # | Decision | Chosen | Consequence |
+| --- | --- | --- | --- |
+| 1 | Motion engine | **Remotion** | Licence exposure begins at 4 people ($25/seat). Motion Canvas renderer is retired once Remotion reaches parity |
+| 2 | LLM | **Gemini 3 Flash, free tier**, with local Ollama fallback | No cost, no card. See the billing trap below |
+| 3 | Generative video | **Off. Removed from the plan.** | Footage and graphics are the only visual sources. No per-video cost, no Veo dependency, and the asset engine becomes more important |
+| 4 | Platform reviews | **Submit both at the start of Phase 6**, not now | Both require a working demo; see below |
+| 5 | Phase 2 target topic | **"How Nuclear Fusion Could Change the Future"** | Taken from your own brief |
+
+### 2 — why Gemini 3 Flash
+
+Free tier: **1,500 requests/day, 250k tokens/minute, 10–15 RPM**, JSON mode and
+structured output included, no credit card. A six-minute video costs roughly 15–25 calls
+(outline, script per section, shot list per scene, metadata), so the daily allowance is
+two orders of magnitude more than one person needs.
+
+> **The trap: enabling billing on the Google Cloud project silently deletes its free
+> tier**, and every call bills from the first token. Create a dedicated project for this
+> and never enable billing on it.
+
+Fallbacks, both behind the same `LLMProvider` interface: **Ollama + Qwen3 8B** locally
+(free, offline, weaker prose) and **Groq** (Llama 3.3 70B, fast, free tier) if Gemini's
+limits ever bind.
+
+### 3 — footage over generation
+
+Generative video is removed, not deferred. Consequences worth stating:
+
+- No per-video API cost. The whole system runs free apart from optional TTS.
+- The **Asset Acquisition Engine becomes the quality ceiling** for anything not a
+  graphic. Ranking over many candidates (§10) moves from a nice-to-have to load-bearing.
+- Motion graphics carry more of the video. The component library and the director's
+  willingness to choose "graphic" over "footage" matter more.
+- `GenerativeVideoProvider` stays in the provider table as an unimplemented interface, so
+  the door is open without any of the cost or dependency today.
+
+### 4 — why not submit the reviews yet
+
+Both reviews want to see the thing working:
+
+- **YouTube's Audit and Quota Extension Form** asks for project id, use case, expected
+  volume, business justification, privacy policy and terms links, **and a demo video of
+  the app's OAuth flow**. The review examines the UI, data handling and privacy
+  disclosures — not just which endpoints are called. Reported waits run from weeks to
+  months.
+- **Meta app review** requires a screencast of the complete user flow, per permission,
+  at 2–4 weeks each.
+
+Submitting before the app exists means submitting a rejection. **The mitigation is to
+make Phase 6 useful without either approval**: YouTube uploads from an unaudited project
+land as private videos on the real channel, which is a genuinely useful "upload draft"
+workflow that needs no audit at all. The UI will show verification state and offer
+"upload as private draft" until the audit clears, rather than a Publish button that
+quietly does something else.
