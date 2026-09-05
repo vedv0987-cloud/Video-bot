@@ -1,0 +1,14 @@
+{
+  "name": "video-studio",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local-first AI video production studio",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "hardware": "npm run -w @studio/hardware detect",
+    "test": "npm run --workspaces --if-present test",
+    "typecheck": "npm run --workspaces --if-present typecheck"
+  },
+  "engines": { "node": ">=20" }
+}
