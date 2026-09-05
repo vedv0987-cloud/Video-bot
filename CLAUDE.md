@@ -154,7 +154,15 @@ Each of these was a real bug found by running the thing, not by reading it.
 
 ## Ved's machine
 
-**MacBook Air · Apple M5 · 10 cores (4P/6E) · 16 GB unified · macOS 26.6.2 · 286 GB free.**
+**MacBook Air · Apple M5 · 10 cores (4P/6E) · 8-core GPU · 16 GB unified · macOS 26.6.2.**
+Measured, not assumed — `npm run hardware` on the machine.
+
+- **Build the Python venv with 3.12.** Ved's default is 3.14.7, and `kokoro-onnx` and
+  `whisperx` both pin `python <3.14`. They fail at `pip install`, late.
+- **VideoToolbox is verified working** (ffmpeg 9.0.1, libx264 present). Hardware encode
+  for previews, libx264 for delivery.
+- **Free memory is the real constraint, not total.** 4.4 GB free with his apps open, so
+  the budget recommends 2 render workers where 16 GB would suggest 4.
 
 - ~10 GB usable for models after the OS. Qwen3 **8B** quantised — larger variants swap.
 - Fanless: sustained load throttles. Long jobs belong in an overnight batch.

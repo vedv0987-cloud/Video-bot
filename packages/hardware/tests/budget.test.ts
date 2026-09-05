@@ -22,7 +22,7 @@ function report(overrides: Partial<HardwareReport> = {}): HardwareReport {
     memory: { totalBytes: 16 * GB, freeBytes: 8 * GB, unified: true },
     disk: { path: '/', totalBytes: 460 * GB, freeBytes: 286 * GB },
     node: { found: true, version: 'v22.0.0' },
-    python: { found: true, version: 'Python 3.11' },
+    python: { found: true, version: 'Python 3.12.7', major: 3, minor: 12, usableForPipeline: true },
     chromium: { found: true },
     ffmpeg: {
       found: true,
@@ -46,9 +46,36 @@ describe('planResources', () => {
 
   it('bounds concurrency by memory when memory is the tighter constraint', () => {
     const small = report({
-      memory: { totalBytes: 8 * GB, freeBytes: 4 * GB, unified: true },
+      memory: { totalBytes: 8 * GB, freeBytes: 6 * GB, unified: true },
     });
     expect(planResources(small).renderConcurrency).toBeLessThan(4);
+  });
+
+  it('sizes from memory that is free, not memory that exists', () => {
+    // The machine has 16 GB and could run four workers, but only 4.4 GB is
+    // free. Four workers would claim all of it and swap the machine.
+    const busy = report({
+      memory: { totalBytes: 16 * GB, freeBytes: 4.4 * GB, unified: true },
+    });
+    const plan = planResources(busy);
+    expect(plan.renderConcurrency).toBeLessThan(plan.capacityConcurrency);
+    expect(plan.renderConcurrency).toBe(2);
+  });
+
+  it('says what closing applications would buy', () => {
+    const busy = report({
+      memory: { totalBytes: 16 * GB, freeBytes: 4.4 * GB, unified: true },
+    });
+    expect(planResources(busy).reasons.join(' ')).toMatch(/closing applications/);
+  });
+
+  it('does not nag when memory is already free', () => {
+    const idle = report({
+      memory: { totalBytes: 16 * GB, freeBytes: 13 * GB, unified: true },
+    });
+    const plan = planResources(idle);
+    expect(plan.renderConcurrency).toBe(plan.capacityConcurrency);
+    expect(plan.reasons.join(' ')).not.toMatch(/closing applications/);
   });
 
   it('never drops below one worker', () => {

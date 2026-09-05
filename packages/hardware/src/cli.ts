@@ -32,7 +32,10 @@ console.log(`  ${cpu.brand}`);
 console.log(`  ${cores}${cpu.emulated ? '  ⚠️  UNDER ROSETTA' : ''}`);
 console.log(`  ${gb(memory.totalBytes)} ${memory.unified ? 'unified' : 'RAM'}, ${gb(memory.freeBytes)} free`);
 console.log(`  ${gb(disk.freeBytes)} free of ${gb(disk.totalBytes)}`);
-console.log(`  ${report.osVersion} · node ${report.node.version} · ${report.python.version ?? 'no python'}`);
+console.log(
+  `  ${report.osVersion} · node ${report.node.version} · ` +
+    `${report.python.version ?? 'no python'}${report.python.found && !report.python.usableForPipeline ? ' ⚠️' : ''}`,
+);
 
 console.log(`\n  FFMPEG`);
 if (ffmpeg.found) {
@@ -48,7 +51,12 @@ if (ffmpeg.found) {
 
 console.log(`\n  RENDER BUDGET`);
 console.log(`  concurrent renders    ${budget.concurrentRenders}`);
-console.log(`  render concurrency    ${budget.renderConcurrency}`);
+console.log(
+  `  render concurrency    ${budget.renderConcurrency}` +
+    (budget.capacityConcurrency > budget.renderConcurrency
+      ? `  (${budget.capacityConcurrency} with memory free)`
+      : ''),
+);
 console.log(`  ffmpeg processes      ${budget.ffmpegProcesses}`);
 console.log(`  tts processes         ${budget.ttsProcesses}`);
 console.log(`  asset downloads       ${budget.assetDownloads}`);

@@ -35,8 +35,44 @@ Get-CimInstance Win32_Processor | Select Name, NumberOfCores
 
 ## 2. Confirmed target machine
 
-**MacBook Air · Apple M5 · 10 cores (4 performance / 6 efficiency) · 16 GB unified memory ·
-macOS 26.6.2 · 286 GB free.**
+**MacBook Air · Apple M5 · 10 cores (4 performance / 6 efficiency) · 8-core GPU ·
+16 GB unified memory · macOS 26.6.2 · 283 GB free.**
+
+Measured on the machine with `npm run hardware`, September 2026:
+
+```
+  Apple M5 · 10 cores · 4P/6E · 8-core GPU
+  16.0 GB unified, 4.4 GB free
+  282.7 GB free of 460.4 GB
+  macOS 26.6.2 · node v22.23.2 · Python 3.14.7 ⚠️
+  ffmpeg 9.0.1 · libx264 ✓ · videotoolbox ✓ verified
+  render concurrency 2  (4 with memory free)
+```
+
+Three things that report settled:
+
+- **VideoToolbox is verified working**, not merely compiled in. Hardware H.264 is
+  available for previews and drafts.
+- **Only 4.4 GB was free** with the usual applications open. The render budget sizes
+  from free memory, not total, so it recommended two workers rather than four. Closing
+  applications before a render is worth more than any setting in this document.
+- **Python 3.14.7 will not install the ML stack** — see the next section.
+
+### ⚠️ Python 3.14 is too new for the voice and alignment stack
+
+`kokoro-onnx` and `whisperx` both pin `python <3.14`. On 3.14 they do not install, and
+you find out several steps into a setup that looked fine.
+
+```bash
+brew install python@3.12
+cd ~/Video-bot
+python3.12 -m venv .venv && source .venv/bin/activate
+python --version          # expect 3.12.x
+pip install -e ".[dev]"
+```
+
+`npm run hardware` checks this and warns, and prefers an installed 3.13/3.12/3.11 over a
+newer default when one is present.
 
 Two facts drive every decision below.
 

@@ -19,6 +19,7 @@ import type {
   DiskInfo,
   FfmpegInfo,
   MemoryInfo,
+  PythonInfo,
 } from './types';
 
 const run = promisify(execFile);
@@ -224,6 +225,37 @@ async function trialVideoToolbox(ffmpeg: string): Promise<boolean> {
     30_000,
   );
   return ok;
+}
+
+/**
+ * The interpreter the content pipeline runs on.
+ *
+ * Version matters more than presence. `kokoro-onnx` and `whisperx` both pin
+ * `python <3.14`, so a machine on 3.14 installs neither — and finds out at
+ * `pip install`, several steps into a setup that looked fine.
+ */
+export const PYTHON_MIN = { major: 3, minor: 11 };
+export const PYTHON_MAX_EXCLUSIVE = { major: 3, minor: 14 };
+
+export async function detectPython(): Promise<PythonInfo> {
+  // Prefer a version the ML stack accepts, if one is installed alongside.
+  const probe = await probeCommand([
+    'python3.13', 'python3.12', 'python3.11', 'python3', 'python',
+  ]);
+  if (!probe.found) return { ...probe, usableForPipeline: false };
+
+  const match = /Python (\d+)\.(\d+)/.exec(probe.version ?? '');
+  if (!match) return { ...probe, usableForPipeline: false };
+
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const atLeastMin =
+    major > PYTHON_MIN.major || (major === PYTHON_MIN.major && minor >= PYTHON_MIN.minor);
+  const belowMax =
+    major < PYTHON_MAX_EXCLUSIVE.major ||
+    (major === PYTHON_MAX_EXCLUSIVE.major && minor < PYTHON_MAX_EXCLUSIVE.minor);
+
+  return { ...probe, major, minor, usableForPipeline: atLeastMin && belowMax };
 }
 
 const CHROMIUM_CANDIDATES = [
