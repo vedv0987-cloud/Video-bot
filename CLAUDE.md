@@ -134,6 +134,13 @@ Each of these was a real bug found by running the thing, not by reading it.
   artifact every run and invalidates align, beats and compose behind it —
   `KOKORO_SEED` is what makes invariant 1 hold for a neural voice. Seed per chunk, not
   per call, so re-chunking leaves untouched chunks byte-identical.
+- **Kokoro reproduces on a machine, not across machines.** The same script and seed
+  gave `b1d89064169b57da` on Ved's M5 and `56eb2995d968ad50` in a Linux x86 container —
+  same sample count (both 32.72 s, so align and beats matched byte for byte), different
+  sample values. That is ordinary float divergence between architectures, and invariants 1
+  and 2 only ever needed determinism *per machine*. But it means a voice cache is not
+  portable: never copy `.cache/voice/` between machines or expect CI to reproduce a wav
+  rendered on the Air.
 - **An unimplemented backend told you to `pip install` it.** `--voice kokoro` failed with
   "not installed in this environment" on a machine where Kokoro *was* installed, because
   the backend was a stub wearing an install hint. Backends that were never written now
