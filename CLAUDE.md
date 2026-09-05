@@ -19,7 +19,8 @@ or algorithmic has failed, however correct its content.
 
 | Doc | What it holds |
 | --- | --- |
-| `docs/UPGRADE-PLAN.md` | v2 architecture, 2026 tool stack with licences, the craft rules, risk register. **The authority.** |
+| `docs/MASTER-PLAN.md` | The studio plan: dashboard, AI director, asset engine, Remotion, publishing, benchmarks. **Awaiting approval — five decisions open in §28.** |
+| `docs/UPGRADE-PLAN.md` | v2 pipeline architecture, 2026 tool stack with licences, the craft rules, risk register |
 | `docs/LOCAL-SETUP.md` | Running the model stages on Ved's Mac, pinned to his hardware |
 | `video-bot-roadmap.md` | Original v1 roadmap. Historical — its tooling choices are superseded |
 
