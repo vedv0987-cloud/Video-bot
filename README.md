@@ -43,11 +43,12 @@ the real models drop in unchanged on a machine with a GPU.
 | Stage | Default here | Swap in with |
 | --- | --- | --- |
 | Rewriter | `template` (verbatim) | `--rewriter qwen3` (Ollama) |
-| Voice | `null` (silent, correct length) | `--voice kokoro` / `chatterbox` |
+| Voice | `null` (silent, correct length) | `--voice kokoro` (implemented) |
 | Alignment | `estimated` | `--aligner whisperx` |
 | Beats | `fixed-tempo` | `--beats librosa` |
 
-Uninstalled backends fail with an install command, never an ImportError.
+Uninstalled backends fail with an install command, never an ImportError; backends that
+are declared but not yet written say *that*, rather than sending you to pip.
 Whatever ran is recorded in `audio.provenance` — an estimate must never read as
 a measurement.
 

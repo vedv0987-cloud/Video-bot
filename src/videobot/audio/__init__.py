@@ -12,13 +12,20 @@ never be mistaken for measured alignment.
 
 from .align import ALIGNERS, AlignResult, get_aligner
 from .beats import BEAT_SOURCES, get_beat_source
-from .speech import SPEECH_BACKENDS, BackendUnavailable, get_speech_backend, wav_duration
+from .speech import (
+    SPEECH_BACKENDS,
+    BackendNotImplemented,
+    BackendUnavailable,
+    get_speech_backend,
+    wav_duration,
+)
 
 __all__ = [
     "ALIGNERS",
     "AlignResult",
     "BEAT_SOURCES",
     "SPEECH_BACKENDS",
+    "BackendNotImplemented",
     "BackendUnavailable",
     "get_aligner",
     "get_beat_source",

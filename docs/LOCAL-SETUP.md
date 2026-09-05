@@ -205,20 +205,26 @@ ffmpeg -hide_banner -encoders | grep videotoolbox
 ### Stage 2 — Voice
 
 ```bash
-brew install espeak-ng       # Kokoro needs it for phonemisation
+brew install espeak-ng       # Kokoro's phonemiser falls back to it for odd words
 pip install kokoro soundfile
 videobot --topic "hydration" --voice kokoro
 ```
 
-Then Chatterbox for finals:
+The first run downloads ~330 MB of weights from Hugging Face and, on English text, a
+13 MB spaCy model that Kokoro's phonemiser fetches for itself. Both are cached; later
+runs are offline and take about as long as the audio is (measured on a 4-core Linux
+container: 33 s of speech in 25 s wall, no GPU — the Air should beat that).
 
-```bash
-pip install chatterbox-tts
-videobot --topic "hydration" --voice chatterbox
-```
+The voice is **seeded** (`KOKORO_SEED`), so re-running the voice node reproduces the same
+wav byte for byte and everything downstream stays cached. Changing the voice or the seed
+changes the model id, which changes the cache key — that is deliberate.
 
-**Verify:** `output/<slug>/` holds a WAV you can listen to, and the spec's
-`audio.provenance.voice.backend` reads `kokoro` or `chatterbox`, not `null`.
+**Verify:** the WAV under `.cache/voice/` is one you can listen to, and the spec's
+`audio.provenance.voice.backend` reads `kokoro`, not `null`.
+
+Chatterbox is named in the plan for finals but is **not written yet** — `--voice
+chatterbox` says so rather than sending you to `pip`. Same for `--aligner whisperx` and
+`--beats librosa`.
 
 > Package names for fast-moving projects move between releases. If `pip install` 404s,
 > check the project's current README rather than trusting the name here.
@@ -242,13 +248,17 @@ and takes twenty times longer while appearing to work.
 
 ### Stage 4 — Alignment and beats
 
-```bash
-pip install whisperx librosa
-videobot --topic "hydration" --voice kokoro --aligner whisperx --beats librosa
-```
+**Not written yet — nothing to install here.** Both backends are declared and both refuse
+with the reason, because the reasons are structural rather than a missing package:
 
-**Verify:** `audio.provenance.alignment.method` reads `whisperx`. That field exists
-precisely so a render tells you whether its timings were measured or estimated.
+- **whisperx** — forced alignment needs the voiceover itself, and the aligner interface is
+  handed only the sections and a duration. Closing that gap is the work.
+- **librosa** — onset detection needs a music track, which the pipeline does not produce
+  until Phase 4. Run it against the voiceover and it finds syllables, not beats.
+
+Until then `--aligner estimated` distributes words by length. `audio.provenance` records
+that as `estimated`, which is the whole point of the field: a render must tell you whether
+its timings were measured or guessed.
 
 ### Stage 5 — Rewriter
 

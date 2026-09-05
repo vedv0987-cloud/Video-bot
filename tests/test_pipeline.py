@@ -10,8 +10,7 @@ from videobot.brand import BrandError, load_brand
 from videobot.cli import main, slugify
 from videobot.platforms import get_format
 
-
-BRAND_PATH = str(Path(__file__).resolve().parents[1] / "brand" / "health-v2.json")
+from conftest import BRAND_PATH
 
 
 # --- brand tokens ---------------------------------------------------------
@@ -134,8 +133,10 @@ def test_provenance_marks_estimated_timings_as_estimated(tmp_path):
     assert provenance["beats"] == {"method": "fixed-tempo", "bpm": 92}
 
 
-def test_uninstalled_backend_exits_with_a_usage_error(tmp_path):
-    assert run_cli(tmp_path, "--voice", "kokoro") == 2
+def test_unusable_backend_exits_with_a_usage_error(tmp_path):
+    """chatterbox, not kokoro: kokoro is real, and asking for it on a machine
+    that has it would pull weights over the network mid-test."""
+    assert run_cli(tmp_path, "--voice", "chatterbox") == 2
 
 
 def test_spec_is_deterministic_across_runs(tmp_path):

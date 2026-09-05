@@ -42,7 +42,12 @@ class FixedTempoBeats:
 
 
 class LibrosaBeats:
-    """Onset detection against a real track."""
+    """Onset detection against a real track.
+
+    Declared, not written: there is no real track to analyse until the music
+    node lands in Phase 4, and onset detection on a voiceover finds syllables,
+    not beats.
+    """
 
     method = "librosa"
 
@@ -50,11 +55,11 @@ class LibrosaBeats:
         self.bpm = bpm
 
     def beats(self, duration_s: float) -> BeatMap:
-        from .speech import BackendUnavailable
+        from .speech import BackendNotImplemented
 
-        raise BackendUnavailable(
-            "beat source 'librosa' is not installed in this environment. "
-            "Install it with: pip install librosa"
+        raise BackendNotImplemented(
+            "beat source 'librosa' has no implementation yet — onset detection needs a music "
+            "track, which the pipeline does not produce until Phase 4. Use --beats fixed-tempo."
         )
 
 
