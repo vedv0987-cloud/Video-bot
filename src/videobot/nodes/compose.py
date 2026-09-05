@@ -244,20 +244,30 @@ class ComposeNode(Node):
                 "type": "cut" if index == 0 else "dip",
                 "dur": 0.0 if index == 0 else TRANSITION_S,
             },
-            "media": (
-                {
-                    "kind": "image",
-                    "src": media["src"],
-                    "credit": media["credit"],
-                    "licence": media["licence"],
-                    "page": media["page"],
-                    "treatment": media["treatment"],
-                }
-                if media
-                else None
-            ),
+            "media": self._media(media, out - start),
             "elements": [element],
         }
+
+    @staticmethod
+    def _media(media: Mapping[str, Any] | None, scene_s: float) -> dict[str, Any] | None:
+        """Spec form of whatever the media node found for this scene."""
+        if not media:
+            return None
+
+        block = {
+            "kind": media["kind"],
+            "src": media["src"],
+            "credit": media["credit"],
+            "licence": media["licence"],
+            "page": media["page"],
+            "treatment": media["treatment"],
+        }
+        if media["kind"] == "video":
+            # The clip plays from its start for as long as the scene lasts. A
+            # scene longer than its footage would freeze on the last frame, so
+            # the span is clamped and the renderer loops what it is given.
+            block["trim"] = {"from": 0.0, "to": round(min(scene_s, media["duration_s"]), 3)}
+        return block
 
     def _element(
         self,

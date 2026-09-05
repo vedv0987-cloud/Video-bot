@@ -540,6 +540,82 @@
               }
             },
             {
+              "type": "object",
+              "required": [
+                "kind",
+                "src",
+                "credit",
+                "licence",
+                "trim",
+                "treatment"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "video"
+                },
+                "src": {
+                  "type": "string"
+                },
+                "credit": {
+                  "type": "string"
+                },
+                "licence": {
+                  "type": "string"
+                },
+                "page": {
+                  "type": "string"
+                },
+                "trim": {
+                  "type": "object",
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Seconds into the source clip. The scene plays this span.",
+                  "properties": {
+                    "from": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "to": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                },
+                "treatment": {
+                  "type": "object",
+                  "required": [
+                    "move",
+                    "scale_from",
+                    "scale_to"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "move": {
+                      "enum": [
+                        "ken-burns-in",
+                        "ken-burns-out",
+                        "pan-left",
+                        "pan-right",
+                        "hold"
+                      ]
+                    },
+                    "scale_from": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "scale_to": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    }
+                  }
+                }
+              }
+            },
+            {
               "type": "null"
             }
           ]

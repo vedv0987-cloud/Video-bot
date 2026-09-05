@@ -69,11 +69,13 @@ export type Element =
 export type BackgroundKind = 'gradient-mesh' | 'particle-field' | 'grid-lines' | 'solid';
 
 export interface SceneMedia {
-  kind: 'image';
+  kind: 'image' | 'video';
   src: string;
   credit: string;
   licence: string;
   page?: string;
+  /** Seconds into the source clip. Video only. */
+  trim?: { from: number; to: number };
   treatment: {
     move: 'ken-burns-in' | 'ken-burns-out' | 'pan-left' | 'pan-right' | 'hold';
     scale_from: number;

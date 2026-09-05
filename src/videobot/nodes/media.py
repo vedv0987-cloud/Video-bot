@@ -13,6 +13,7 @@ content digest, so a re-run with unchanged inputs reuses the same files.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 from ..cache import Artifact
@@ -20,12 +21,28 @@ from ..dag import Node
 from ..hashing import digest_bytes
 from ..http import FetchError, get_bytes
 from ..sources.commons import CommonsImageSource
+from ..sources.footage import LocalFootageSource, PexelsVideoSource, probe_clip
 
 MAX_IMAGES = 3
 """More than a few stills in a 30-second cut starts to look like a slideshow
 of someone else's photographs rather than a designed piece."""
 
 MOVES = ("ken-burns-in", "pan-left", "ken-burns-out", "pan-right")
+
+MAX_CLIPS = 4
+"""Footage is the visual language when it is present, so more scenes may carry
+a clip than may carry a still — but a cut that changes picture every two
+seconds reads as a trailer, not an explainer."""
+
+
+def footage_source(ctx: Mapping[str, Any]):
+    """The footage backend this run asked for, or None."""
+    choice = ctx.get("footage")
+    if not choice:
+        return None
+    if choice == "pexels":
+        return PexelsVideoSource()
+    return LocalFootageSource(choice)
 
 
 def queries(topic: str) -> list[str]:
@@ -46,22 +63,35 @@ class MediaNode(Node):
     suffix = ".json"
 
     def params(self, ctx: Mapping[str, Any]) -> dict[str, Any]:
-        # The image source's version rides in the key for the same reason the
-        # research node carries its sources': changing how images are chosen
+        # The source's version rides in the key for the same reason the
+        # research node carries its sources': changing how media is chosen
         # must not leave a warm cache serving the old choices.
+        footage = footage_source(ctx)
         return {
             "topic": ctx["topic"],
             "enabled": ctx["media"],
             "source": f"{CommonsImageSource.kind}@{CommonsImageSource.version}",
+            "footage": (
+                f"{footage.kind}@{footage.version}:{ctx['footage']}" if footage else None
+            ),
         }
 
     def produce(self, ctx: Mapping[str, Any], inputs: Mapping[str, Artifact]) -> bytes:
         script = inputs["script"].read_json()
+        store = ctx["cache_root"] / "media"
+
+        # Footage first: when there is real motion under the type, stills are
+        # not wanted as well — two picture systems in one cut look like an
+        # accident rather than a choice.
+        footage = footage_source(ctx)
+        if footage is not None:
+            store.mkdir(parents=True, exist_ok=True)
+            return _footage_manifest(footage, script, store)
+
         if not ctx["media"]:
             return json.dumps({"images": {}, "notes": ["media disabled"]}, indent=2).encode()
 
         source = CommonsImageSource()
-        store = ctx["cache_root"] / "media"
         store.mkdir(parents=True, exist_ok=True)
 
         images: dict[str, Any] = {}
@@ -115,3 +145,62 @@ class MediaNode(Node):
             }
 
         return json.dumps({"images": images, "notes": notes}, indent=2, ensure_ascii=False).encode()
+
+
+def _footage_manifest(source: Any, script: Mapping[str, Any], store: Path) -> bytes:
+    """Clips for the scenes that can carry one.
+
+    A source failure is recorded and the run continues on procedural
+    backgrounds — a missing key should cost you the footage, not the video.
+    """
+    images: dict[str, Any] = {}
+    notes: list[str] = []
+    clips: list[Any] = []
+
+    for query in queries(script["topic"]):
+        if len(clips) >= MAX_CLIPS:
+            break
+        try:
+            clips.extend(source.fetch(query, MAX_CLIPS))
+        except FetchError as exc:
+            notes.append(f"footage search {query!r} failed — {exc}")
+            break  # a key that is missing for one query is missing for all
+
+    points = [s for s in script["sections"] if s["kind"] == "point"][:MAX_CLIPS]
+    for index, (section, clip) in enumerate(zip(points, clips)):
+        try:
+            path = _stage(clip, store)
+            duration = clip.duration_s or probe_clip(path)
+        except (FetchError, OSError, RuntimeError) as exc:
+            notes.append(f"{section['id']}: clip unusable — {exc}")
+            continue
+
+        images[section["id"]] = {
+            "kind": "video",
+            "src": str(path),
+            "credit": clip.credit,
+            "licence": clip.licence,
+            "page": clip.page,
+            "duration_s": round(duration, 3),
+            "treatment": {
+                "move": MOVES[index % len(MOVES)],
+                "scale_from": 1.0 if index % 2 == 0 else 1.12,
+                "scale_to": 1.12 if index % 2 == 0 else 1.0,
+            },
+        }
+
+    if not images and not notes:
+        notes.append("no footage cleared the size and length filters")
+    return json.dumps({"images": images, "notes": notes}, indent=2, ensure_ascii=False).encode()
+
+
+def _stage(clip: Any, store: Path) -> Path:
+    """Local clips stay where they are; remote ones land in the cache by digest."""
+    if clip.local:
+        return Path(clip.src)
+
+    payload = get_bytes(clip.src)
+    path = store / f"{digest_bytes(payload)}.mp4"
+    if not path.exists():
+        path.write_bytes(payload)
+    return path

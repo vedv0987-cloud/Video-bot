@@ -56,9 +56,19 @@ export function chooseComponent(
   }
 }
 
-/** A still under a slow move. A static photograph in a moving cut reads as a stall. */
+/**
+ * A still under a slow move. A static photograph in a moving cut reads as a stall.
+ *
+ * Footage deliberately does *not* go through here. Motion Canvas's Video node
+ * hangs this renderer outright: frames are pulled by seeking the playback
+ * manager and screenshotting, and an HTMLVideoElement never becomes ready
+ * under that loop — measured, the render stops dead at the first scene
+ * carrying a clip. Footage is composited by ffmpeg instead, which decodes
+ * video properly and is already in the chain. These scenes render with a
+ * transparent background and the clip is laid in underneath afterwards.
+ */
 function mediaLayer(plan: RenderPlan, scene: PlannedScene): { node: Img; move: ThreadGenerator } | null {
-  if (!scene.media) return null;
+  if (!scene.media || scene.media.kind !== 'image') return null;
   const { treatment } = scene.media;
 
   const node = new Img({
@@ -140,14 +150,16 @@ export function* renderScene(
   const root = new Layout({});
   view.add(root);
 
+  // A footage scene leaves its background transparent so ffmpeg can lay the
+  // clip in underneath; drawing a procedural background there would simply
+  // hide it.
+  const overFootage = scene.media?.kind === 'video';
   const background = buildBackground(plan, scene);
-  root.add(background.node);
+  if (!overFootage) root.add(background.node);
 
   const media = mediaLayer(plan, scene);
-  if (media) {
-    root.add(media.node);
-    root.add(scrim(plan));
-  }
+  if (media) root.add(media.node);
+  if (media || overFootage) root.add(scrim(plan));
 
   const built = scene.elements.map((element) =>
     chooseComponent(scene.layout, element)({
@@ -171,7 +183,7 @@ export function* renderScene(
   if (dip > 0) root.opacity(0);
 
   yield* all(
-    background.animate(),
+    overFootage ? waitFor(0) : background.animate(),
     media?.move ?? waitFor(0),
     ...built.map((item) => item.timeline(scene.in)),
     dip > 0
