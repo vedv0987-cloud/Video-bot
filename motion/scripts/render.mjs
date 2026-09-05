@@ -128,6 +128,52 @@ await mkdir(dirname(outPath), { recursive: true });
 const voPath = spec.audio?.vo?.path ? resolve(repo, spec.audio.vo.path) : null;
 const hasAudio = voPath && existsSync(voPath);
 
+/**
+ * Footage, laid in under the graphics.
+ *
+ * Not drawn by the engine: Motion Canvas's Video node hangs this renderer,
+ * because frames are pulled by seeking and screenshotting and an
+ * HTMLVideoElement never becomes ready under that loop. ffmpeg decodes video
+ * properly and is already in the chain, so footage scenes render transparent
+ * and the clips go in here.
+ *
+ * Each clip is scaled to cover the frame, cropped to it, trimmed to its
+ * scene's length, and shifted to the scene's start. The graphics sequence goes
+ * over the top; its alpha is what lets the footage show through.
+ */
+function footageFilter(scenes, width, height, duration) {
+  const clips = scenes
+    .map((scene, index) => ({ scene, index }))
+    .filter(({ scene }) => scene.media?.kind === 'video' && scene.media.src)
+    .filter(({ scene }) => scene.in < duration);
+  if (clips.length === 0) return { inputs: [], filter: null };
+
+  const inputs = [];
+  const parts = [`color=c=black:s=${width}x${height}:r=${fps}:d=${duration}[bed0]`];
+
+  clips.forEach(({ scene }, order) => {
+    const span = Math.max(0.04, Math.min(scene.out, duration) - scene.in);
+    const from = scene.media.trim?.from ?? 0;
+    inputs.push('-i', resolve(root, scene.media.src.replace(/^\//, '')));
+    // The clip is shorter than the scene often enough to matter; looping the
+    // input rather than the filter keeps a scene from freezing on a last frame.
+    parts.push(
+      `[${order + 1}:v]trim=start=${from.toFixed(3)}:duration=${span.toFixed(3)},` +
+        `setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase,` +
+        `crop=${width}:${height},fps=${fps},format=rgba[clip${order}]`,
+    );
+    parts.push(
+      `[bed${order}][clip${order}]overlay=enable='between(t,${scene.in.toFixed(3)},` +
+        `${Math.min(scene.out, duration).toFixed(3)})':x=0:y=0:shortest=0[bed${order + 1}]`,
+    );
+  });
+
+  parts.push(`[bed${clips.length}][0:v]overlay=x=0:y=0:shortest=1,noise=alls=5:allf=t+u,format=yuv420p[v]`);
+  return { inputs, filter: parts.join(';') };
+}
+
+const composite = footageFilter(spec.scenes ?? [], outW, outH, duration);
+
 // Grain and loudness live here, not in the engine: ffmpeg's noise filter is
 // better than anything drawn on a canvas, and EBU R128 needs the final mix.
 const video = 'noise=alls=5:allf=t+u,format=yuv420p';
@@ -135,8 +181,10 @@ const args = [
   '-y', '-hide_banner', '-loglevel', 'warning',
   '-framerate', String(fps),
   '-i', resolve(frameDir, '%06d.png'),
+  ...composite.inputs,
   ...(hasAudio ? ['-i', voPath] : []),
-  '-vf', video,
+  ...(composite.filter ? ['-filter_complex', composite.filter, '-map', '[v]'] : ['-vf', video]),
+  ...(composite.filter && hasAudio ? ['-map', `${composite.inputs.length / 2 + 1}:a`] : []),
   '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p',
   '-movflags', '+faststart',
   ...(hasAudio

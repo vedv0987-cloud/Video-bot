@@ -81,6 +81,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     backends.add_argument(
+        "--footage",
+        default=None,
+        metavar="pexels|FOLDER",
+        help=(
+            "moving footage under the type: 'pexels' (needs PEXELS_API_KEY) or a "
+            "path to a folder of your own clips. Replaces stills when set"
+        ),
+    )
+    backends.add_argument(
         "--offline",
         action="store_true",
         help="skip live retrieval; produces an uncited spec that cannot pass the gate",
@@ -122,6 +131,7 @@ def run_pipeline(args: argparse.Namespace, on_node: OnNode = None) -> RunOutcome
         "beats": args.beats,
         "bpm": args.bpm,
         "media": args.media and not args.offline,
+        "footage": None if args.offline else args.footage,
         "cache_root": args.cache,
     }
     force = frozenset(name for name in args.force.split(",") if name)
@@ -151,6 +161,7 @@ def run_pipeline(args: argparse.Namespace, on_node: OnNode = None) -> RunOutcome
                     "voice": args.voice,
                     "aligner": args.aligner,
                     "beats": args.beats,
+                    "footage": args.footage,
                 },
                 "sources": ctx["sources"].describe(),
                 "screened_out": report.artifacts["script"].read_json()["rejected"],

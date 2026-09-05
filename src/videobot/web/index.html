@@ -115,6 +115,10 @@
           <select id="voice"></select>
         </div>
       </div>
+      <div style="margin-top:14px">
+        <label for="footage">Footage <span style="text-transform:none;font-weight:500">— a folder of your clips, or <code>pexels</code></span></label>
+        <input id="footage" type="text" placeholder="~/Movies/b-roll   (blank = procedural backgrounds)" autocomplete="off">
+      </div>
       <div class="checks">
         <label class="check"><input type="checkbox" id="render" checked>
           <span>Render the MP4<small>Off gives you the scene spec only, in seconds</small></span></label>
@@ -221,6 +225,7 @@ $('go').onclick = async () => {
     aspect: $('aspect').value,
     voice: $('voice').value,
     media: $('media').checked,
+    footage: $('footage').value.trim(),
     render: $('render').checked,
     preview: $('preview').checked,
   };

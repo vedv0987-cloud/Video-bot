@@ -34,24 +34,33 @@ class FetchError(RuntimeError):
     """Raised when a source cannot be reached or returns a bad response."""
 
 
-def get_bytes(url: str) -> bytes:
-    """GET raw bytes — images, and anything else not JSON."""
-    return _fetch(url)
+def get_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
+    """GET raw bytes — images, video, anything not JSON."""
+    return _fetch(url, headers)
 
 
-def get_json(url: str, params: dict[str, Any] | None = None) -> Any:
-    """GET a URL and parse JSON, throttled and with a descriptive agent."""
+def get_json(
+    url: str,
+    params: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+) -> Any:
+    """GET a URL and parse JSON, throttled and with a descriptive agent.
+
+    `headers` carries API keys. They belong in a header rather than a query
+    string: a URL ends up in logs, in exception messages and in `run.json`,
+    and a key that leaks there has leaked everywhere.
+    """
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
 
-    payload = _fetch(url)
+    payload = _fetch(url, headers)
     try:
         return json.loads(payload)
     except json.JSONDecodeError as exc:
         raise FetchError(f"{url}: response was not JSON — {exc}") from exc
 
 
-def _fetch(url: str) -> bytes:
+def _fetch(url: str, headers: dict[str, str] | None = None) -> bytes:
     """One throttled, retrying GET."""
     global _last_request_at
 
@@ -59,7 +68,7 @@ def _fetch(url: str) -> bytes:
     if elapsed < MIN_INTERVAL_S:
         time.sleep(MIN_INTERVAL_S - elapsed)
 
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
 
     payload: bytes | None = None
     last_error: Exception | None = None

@@ -93,6 +93,7 @@ class Studio:
                 beats=_choice(request.get("beats"), BEAT_SOURCES, "fixed-tempo"),
                 bpm=DEFAULT_BPM,
                 media=bool(request.get("media")),
+                footage=_footage(request),
                 offline=bool(request.get("offline")),
                 brand=self.brand,
                 cache=self.cache,
@@ -190,6 +191,22 @@ class Studio:
         if not candidate.is_relative_to(self.out) or not candidate.is_file():
             raise FileNotFoundError(relative)
         return candidate
+
+
+def _footage(request: dict[str, Any]) -> str | None:
+    """Footage choice from the browser.
+
+    A folder path is the one free-text field besides the topic, so it is
+    resolved and checked for existence here rather than trusted; anything else
+    falls back to no footage.
+    """
+    choice = request.get("footage")
+    if choice == "pexels":
+        return "pexels"
+    if isinstance(choice, str) and choice.strip():
+        folder = Path(choice).expanduser()
+        return str(folder) if folder.is_dir() else None
+    return None
 
 
 def _choice(value: Any, allowed: Any, fallback: str) -> str:
