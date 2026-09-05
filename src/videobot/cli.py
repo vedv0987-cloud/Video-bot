@@ -13,8 +13,10 @@ import argparse
 import json
 import re
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Callable
 
 from .audio.align import ALIGNERS
 from .audio.beats import BEAT_SOURCES, DEFAULT_BPM
@@ -27,6 +29,9 @@ from .nodes.script import REWRITERS, InventedClaimError
 from .platforms import FORMATS
 from .sources import SourceSet, live_sources
 from . import spec as spec_mod
+
+OnNode = Callable[[str, bool, str], None] | None
+"""Progress callback: node name, whether it was a cache hit, and its digest."""
 
 DEFAULT_BRAND = Path("brand/health-v2.json")
 DEFAULT_CACHE = Path(".cache")
@@ -83,15 +88,27 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+@dataclass(frozen=True)
+class RunOutcome:
+    """Everything a caller needs to report on a completed run."""
 
-    try:
-        slug = slugify(args.topic)
-        brand = load_brand(args.brand)
-    except (BrandError, ValueError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+    slug: str
+    spec: dict
+    spec_path: Path
+    run_path: Path
+    report: Any
+    warnings: list[str]
+    screened: list[dict]
+
+
+def run_pipeline(args: argparse.Namespace, on_node: OnNode = None) -> RunOutcome:
+    """Topic in, written spec out.
+
+    Shared by the CLI and the dashboard so there is one pipeline, not two.
+    Raises rather than printing: the caller decides how a failure is shown.
+    """
+    slug = slugify(args.topic)
+    brand = load_brand(args.brand)
 
     ctx = {
         "topic": args.topic,
@@ -110,22 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     force = frozenset(name for name in args.force.split(",") if name)
 
     runner = Runner(Cache(args.cache), default_nodes())
-    try:
-        report = runner.run(ctx, force=force)
-    except (BackendUnavailable, InventedClaimError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
-    except KeyError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+    report = runner.run(ctx, force=force, on_node=on_node)
 
     scene_spec = report.artifacts["compose"].read_json()
-
-    try:
-        spec_mod.validate(scene_spec)
-    except spec_mod.SpecError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+    spec_mod.validate(scene_spec)
 
     warnings = spec_mod.lint(scene_spec)
     out_dir = args.out / slug
@@ -161,12 +166,43 @@ def main(argv: list[str] | None = None) -> int:
         "utf-8",
     )
 
+    return RunOutcome(
+        slug=slug,
+        spec=scene_spec,
+        spec_path=spec_path,
+        run_path=run_path,
+        report=report,
+        warnings=warnings,
+        screened=report.artifacts["script"].read_json()["rejected"],
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        outcome = run_pipeline(args)
+    except (BrandError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except (BackendUnavailable, InventedClaimError, KeyError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except spec_mod.SpecError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    report = outcome.report
+    scene_spec = outcome.spec
+    warnings = outcome.warnings
+    screened = outcome.screened
+    spec_path, run_path = outcome.spec_path, outcome.run_path
+
     for name in report.order:
         state = "hit " if name in report.hits else "miss"
         print(f"  [{state}] {name}  {report.artifacts[name].digest}")
     print(f"\nspec:  {spec_path}")
     print(f"run:   {run_path}")
-    screened = report.artifacts["script"].read_json()["rejected"]
     print(
         f"scenes: {len(scene_spec['scenes'])}  "
         f"duration: {scene_spec['meta']['duration_s']}s  "

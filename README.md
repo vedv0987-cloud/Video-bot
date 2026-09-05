@@ -25,6 +25,16 @@ research ──▶ script ──▶ voice ─┬─▶ align ─┐
 The motion layer is a separate TypeScript project under [`motion/`](motion/), joined to
 the content layer only by the spec file. See [motion/README.md](motion/README.md).
 
+There is a dashboard — the pipeline without a terminal:
+
+```bash
+./scripts/dashboard.sh          # opens http://127.0.0.1:8765
+```
+
+Topic in, live progress through the seven pipeline nodes, the MP4 playing in the
+page, and every past run in a library. Stdlib only: no build step, no npm, nothing
+to install beyond the venv you already have.
+
 On a Mac, one command takes a clean checkout all the way to a finished MP4 —
 it picks an interpreter the ML stack will install on, adds espeak-ng and Kokoro,
 builds the spec, then renders it:

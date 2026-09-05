@@ -46,6 +46,7 @@ research ──▶ script ──▶ voice ─┬─▶ align ─┐
 ```
 
 ```bash
+./scripts/dashboard.sh                # the studio UI, http://127.0.0.1:8765
 pip install -e ".[dev]" && pytest
 videobot --topic "dehydration"        # live retrieval
 videobot --topic "x" --offline        # no network; cannot pass the gate
