@@ -152,7 +152,7 @@ def test_run_report_records_cache_state_and_provenance(tmp_path):
 
     report = json.loads((tmp_path / "out" / "hydration" / "run.json").read_text())
     assert report["cache"]["hits"] == [
-        "research", "script", "voice", "align", "beats", "compose",
+        "research", "script", "media", "voice", "align", "beats", "compose",
     ]
     assert report["brand"]["id"] == "health-v2"
     assert report["backends"]["voice"] == "null"
@@ -180,6 +180,28 @@ def test_each_aspect_produces_a_valid_spec(tmp_path):
         spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
         spec_mod.validate(spec)
         assert spec["meta"]["aspect"] == aspect
+
+
+def test_media_is_off_by_default(tmp_path):
+    """An irrelevant photograph is worse than a clean procedural background."""
+    run_cli(tmp_path)
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    assert all(scene["media"] is None for scene in spec["scenes"])
+
+
+def test_every_scene_declares_a_background_system(tmp_path):
+    run_cli(tmp_path)
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    allowed = {"gradient-mesh", "particle-field", "grid-lines", "solid"}
+    assert {scene["bg"]["type"] for scene in spec["scenes"]} <= allowed
+
+
+def test_scenes_carry_word_ranges_for_kinetic_type(tmp_path):
+    run_cli(tmp_path)
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    for scene in spec["scenes"]:
+        assert scene["words"]["to"] >= scene["words"]["from"]
+        assert scene["words"]["to"] < len(spec["audio"]["words"])
 
 
 def test_spec_carries_safe_area_numbers_not_just_a_name(tmp_path):

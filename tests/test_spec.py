@@ -34,7 +34,8 @@ def test_gap_in_timeline_is_rejected(spec):
     spec["scenes"].append(
         {
             "id": "second", "in": 2.5, "out": 4.0, "tier": "A", "layout": "end-card",
-            "bg": {"type": "solid"}, "elements": [],
+            "bg": {"type": "solid"}, "words": {"from": 0, "to": 0},
+            "transition": {"type": "dip", "dur": 0.28}, "media": None, "elements": [],
         }
     )
     expect_error(spec, "contiguous")

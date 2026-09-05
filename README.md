@@ -6,7 +6,7 @@ Automated short-form health & fitness video pipeline — free and open-source en
 - [`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md) — v2 architecture, 2026 tool stack, and the craft rules
 - [`docs/LOCAL-SETUP.md`](docs/LOCAL-SETUP.md) — running the GPU stages on your own machine, by hardware tier
 
-## Status: Phase 3 — motion layer renders
+## Status: Phase 3 complete — it renders an MP4
 
 The content layer produces a **scene spec**: a declarative, engine-agnostic
 description of the finished video, with live citations, a voiceover, word
@@ -23,6 +23,17 @@ research ──▶ script ──▶ voice ─┬─▶ align ─┐
 
 The motion layer is a separate TypeScript project under [`motion/`](motion/), joined to
 the content layer only by the spec file. See [motion/README.md](motion/README.md).
+
+```bash
+videobot --topic "dehydration"                       # spec
+cd motion && npm install
+npm run prepare-data -- ../output/dehydration/scene-spec.json
+npm run render                                       # → output/<slug>/<slug>-9x16.mp4
+```
+
+What comes out: three procedural background systems cycled across scenes, word-by-word
+kinetic type synced to the voiceover, dip transitions, a vignette, film grain and EBU
+R128 loudness from ffmpeg, and the voiceover muxed in.
 
 Retrieval is live (Wikipedia + PubMed). Voice, alignment and beats sit behind
 interfaces with deterministic offline defaults, so the graph runs anywhere and

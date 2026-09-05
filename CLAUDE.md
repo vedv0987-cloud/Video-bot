@@ -27,8 +27,8 @@ or algorithmic has failed, however correct its content.
 
 ## Current state
 
-**Phases 1, 2 and 3 are complete and merged. Phase 4 is next.** 115 Python tests
-and 18 TypeScript tests pass.
+**Phases 1–3 are complete and merged; the pipeline renders an MP4.** 118 Python
+tests and 18 TypeScript tests pass.
 
 ```
 research ──▶ script ──▶ voice ─┬─▶ align ─┐
@@ -51,10 +51,11 @@ turns a spec into an engine-independent render plan; `render.tsx` interprets it;
 `components/` holds the five card types. `npm run stills` pulls PNGs through headless
 Chromium without opening the editor.
 
-**Phase 4** = finishing: libass karaoke captions from `audio.words`, two-pass loudnorm to
--14 LUFS with sidechain ducking, a single LUT grade, the 9:16 / 1:1 / 16:9 encode ladder,
-QC gates, and OpenTimelineIO export. Video encode is still unwired — the motion layer
-currently produces stills, not an MP4.
+`npm run render` produces the MP4: frames out of headless Chromium, then ffmpeg for
+grain, EBU R128 loudness and the h264 encode, with the voiceover muxed in.
+
+**Phase 4 remains**: sidechain ducking once there is music, a LUT grade, the 1:1 and 16:9
+ladder, QC gates (VMAF, loudness verify, safe-area check) and OpenTimelineIO export.
 
 ---
 
@@ -108,6 +109,17 @@ Each of these was a real bug found by running the thing, not by reading it.
   renderer awaits `document.fonts.ready`.
 - **The safe area used to cross the seam as a name.** The renderer would have needed its
   own copy of the platform table; the numbers now travel in `meta.safe_area`.
+- **Building an image search query from each claim's own words produced verb soup** —
+  "dehydration occurs exceeds intake". One search on the topic, widened once, is both
+  simpler and better.
+- **Wikimedia Commons is a poor b-roll source for health.** The pool is clinical
+  documentation, and general search returns an aerial of ploughed fields for
+  "dehydration". `--media` is therefore **opt-in**; the procedural backgrounds are the
+  default visual language. Do not flip this without looking at what comes back.
+- **Playwright bundles a minimal ffmpeg with no libx264.** It fails at the encode, after
+  every frame has been rendered. `render.mjs` verifies the codec before starting.
+- **`cd` persists between Bash calls.** Several patch scripts silently wrote nothing
+  because the working directory was `motion/`. Use absolute paths.
 
 ---
 

@@ -7,7 +7,7 @@
   "scripts": {
     "serve": "vite",
     "build": "vite build",
-    "render": "vite build && node scripts/render.mjs",
+    "render": "node scripts/render.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "stills": "node scripts/stills.mjs",

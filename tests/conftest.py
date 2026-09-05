@@ -35,7 +35,10 @@ _MINIMAL: dict[str, Any] = {
             "out": 4.0,
             "tier": "A",
             "layout": "statement-center",
-            "bg": {"type": "solid"},
+            "bg": {"type": "solid", "seed": 1, "drift": 0.02},
+            "words": {"from": 0, "to": 0},
+            "transition": {"type": "cut", "dur": 0.0},
+            "media": None,
             "elements": [
                 {
                     "type": "text",

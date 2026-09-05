@@ -9,6 +9,7 @@ export const tokens: BrandTokens = {
     ink: '#f2f6ff',
     ink_muted: '#9aa9c4',
     accent: '#38e0a6',
+    accent_alt: '#4c8dff',
     gradient: ['#0b1220', '#16304a'],
   },
   type: {
@@ -55,7 +56,11 @@ export function spec(overrides: Partial<SceneSpec> = {}): SceneSpec {
       vo: null,
       music: null,
       beats: [],
-      words: [],
+      words: [
+        { w: 'You', t0: 0.4, t1: 0.7 },
+        { w: 'are', t0: 0.76, t1: 1.0 },
+        { w: 'water.', t0: 1.06, t1: 1.6 },
+      ],
       provenance: {
         voice: { backend: 'null', model: 'silence' },
         alignment: { method: 'estimated' },
@@ -69,7 +74,10 @@ export function spec(overrides: Partial<SceneSpec> = {}): SceneSpec {
         out: 6,
         tier: 'A',
         layout: 'statement-center',
-        bg: { type: 'gradient-mesh', seed: 1, drift: 0.02 },
+        bg: { type: 'gradient-mesh', seed: 1, drift: 0.02, density: 1 },
+        words: { from: 0, to: 2 },
+        transition: { type: 'cut', dur: 0 },
+        media: null,
         elements: [
           {
             type: 'text',

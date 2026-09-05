@@ -136,6 +136,9 @@ def run_graph(tmp_path, sources, **overrides):
         "aligner": "estimated",
         "beats": "fixed-tempo",
         "bpm": 92,
+        # Retrieval of imagery is exercised separately; graph tests stay offline.
+        "media": False,
+        "cache_root": tmp_path / "cache",
         **overrides,
     }
     report = Runner(Cache(tmp_path / "cache"), default_nodes()).run(ctx)

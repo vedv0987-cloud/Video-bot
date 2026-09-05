@@ -15,3 +15,4 @@ output/
 motion/node_modules/
 motion/dist/
 motion/data/
+motion/.frames/
