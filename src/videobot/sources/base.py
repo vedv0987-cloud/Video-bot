@@ -34,6 +34,17 @@ class Source(Protocol):
     """Anything that can turn a topic into citable passages."""
 
     kind: str
+    version: str
+    """Bump when the fetching logic changes.
+
+    Cache keys are built from node version, params and upstream digests — never
+    from source code. So a source can be fixed, merged and tested, and every
+    machine with a warm cache keeps serving what the broken version returned.
+    That happened: the disambiguation fix landed and the pipeline went on
+    producing a video about a sedative. Carrying the version in `describe()`,
+    which feeds the research node's params, puts the thing you must bump next
+    to the code you just changed.
+    """
 
     def fetch(self, topic: str, limit: int) -> Sequence[Evidence]: ...
 
@@ -70,7 +81,7 @@ class SourceSet:
         return GatherResult(collected, failures)
 
     def describe(self) -> list[str]:
-        return [source.kind for source in self.sources]
+        return [f"{source.kind}@{source.version}" for source in self.sources]
 
 
 def live_sources() -> SourceSet:

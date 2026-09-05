@@ -112,6 +112,7 @@ def test_boundaries_are_strictly_increasing():
 
 class FakeSource:
     kind = "wikipedia"
+    version = "1"
 
     def __init__(self, *evidence: Evidence) -> None:
         self._evidence = evidence
@@ -225,6 +226,7 @@ def test_scene_count_follows_the_retrieved_evidence(tmp_path):
 
 class BrokenSource:
     kind = "wikipedia"
+    version = "1"
 
     def fetch(self, topic, limit):
         raise RuntimeError("upstream is down")
@@ -245,6 +247,7 @@ def test_references_without_claim_cards_cannot_pass_the_gate(tmp_path):
 
     class RefsOnly:
         kind = "pubmed"
+        version = "1"
 
         def fetch(self, topic, limit):
             return [Evidence("A study of fluid balance in adults.", "PMID:7", "pubmed", "J", "u")]

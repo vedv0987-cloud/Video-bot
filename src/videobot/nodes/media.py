@@ -46,7 +46,14 @@ class MediaNode(Node):
     suffix = ".json"
 
     def params(self, ctx: Mapping[str, Any]) -> dict[str, Any]:
-        return {"topic": ctx["topic"], "enabled": ctx["media"]}
+        # The image source's version rides in the key for the same reason the
+        # research node carries its sources': changing how images are chosen
+        # must not leave a warm cache serving the old choices.
+        return {
+            "topic": ctx["topic"],
+            "enabled": ctx["media"],
+            "source": f"{CommonsImageSource.kind}@{CommonsImageSource.version}",
+        }
 
     def produce(self, ctx: Mapping[str, Any], inputs: Mapping[str, Artifact]) -> bytes:
         script = inputs["script"].read_json()

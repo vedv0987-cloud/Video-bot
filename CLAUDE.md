@@ -148,6 +148,14 @@ Each of these was a real bug found by running the thing, not by reading it.
 - **The suite only passed under `python -m pytest`.** `tests/test_nodes.py` imported
   `BRAND_PATH` across test modules, which needs `tests` to be importable — true only when
   CWD is on `sys.path`. Shared test constants belong in `conftest.py`.
+- **A merged, tested fix did nothing, because the cache never saw it.** The
+  disambiguation fix landed and the pipeline went on emitting a script about a
+  sedative: cache keys are built from node version, params and upstream digests
+  — never from source code — so changing `wikipedia.py` left the key identical
+  and every warm cache kept serving the broken output. Sources now carry their
+  own `version`, and `SourceSet.describe()` puts it in the research node's
+  params, so the thing you must bump sits next to the code you changed. Bump it
+  whenever a source's fetching logic changes.
 - **`cd` persists between Bash calls.** Several patch scripts silently wrote nothing
   because the working directory was `motion/`. Use absolute paths.
 

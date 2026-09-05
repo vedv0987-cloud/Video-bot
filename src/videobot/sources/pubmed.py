@@ -36,6 +36,7 @@ def _identity() -> dict[str, str]:
 
 class PubMedSource:
     kind = "pubmed"
+    version = "1"
 
     def fetch(self, topic: str, limit: int) -> Sequence[Evidence]:
         search = get_json(
