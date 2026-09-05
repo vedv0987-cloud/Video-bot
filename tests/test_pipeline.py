@@ -180,3 +180,19 @@ def test_each_aspect_produces_a_valid_spec(tmp_path):
         spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
         spec_mod.validate(spec)
         assert spec["meta"]["aspect"] == aspect
+
+
+def test_spec_carries_safe_area_numbers_not_just_a_name(tmp_path):
+    """The motion layer must not need a platform table to place text."""
+    run_cli(tmp_path)
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+
+    assert spec["meta"]["safe_area"] == {
+        "name": "social-9x16", "top": 0.12, "right": 0.06, "bottom": 0.2, "left": 0.06,
+    }
+
+
+def test_safe_area_matches_the_aspect(tmp_path):
+    run_cli(tmp_path, "--aspect", "16:9")
+    spec = spec_mod.read(tmp_path / "out" / "hydration" / "scene-spec.json")
+    assert spec["meta"]["safe_area"]["name"] == "social-16x9"

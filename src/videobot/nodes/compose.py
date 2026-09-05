@@ -68,7 +68,7 @@ def scene_boundaries(
 
 class ComposeNode(Node):
     name = "compose"
-    version = "3"
+    version = "4"
     deps = ("script", "voice", "align", "beats")
     suffix = ".json"
 
@@ -144,6 +144,7 @@ class ComposeNode(Node):
                 "aspect": fmt.aspect,
                 "fps": fmt.fps,
                 "resolution": list(fmt.authoring),
+                "safe_area": fmt.safe.as_dict(),
             },
             "brand": brand.ref(),
             "audio": {

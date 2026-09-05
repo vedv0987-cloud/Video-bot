@@ -24,6 +24,16 @@ class SafeArea:
     left: float
     right: float
 
+    def as_dict(self) -> dict[str, float | str]:
+        """The form the spec carries, so the renderer needs no platform table."""
+        return {
+            "name": self.name,
+            "top": self.top,
+            "right": self.right,
+            "bottom": self.bottom,
+            "left": self.left,
+        }
+
     def inset_px(self, width: int, height: int) -> tuple[int, int, int, int]:
         """Safe-area inset in pixels as (top, right, bottom, left)."""
         return (

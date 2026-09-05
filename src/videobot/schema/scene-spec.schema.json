@@ -65,7 +65,8 @@
         "duration_s",
         "aspect",
         "fps",
-        "resolution"
+        "resolution",
+        "safe_area"
       ],
       "additionalProperties": false,
       "properties": {
@@ -106,6 +107,44 @@
           },
           "minItems": 2,
           "maxItems": 2
+        },
+        "safe_area": {
+          "type": "object",
+          "description": "Platform chrome insets as fractions of the frame. Carried in the spec so the motion layer never has to resolve a platform name.",
+          "required": [
+            "name",
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "top": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5
+            },
+            "right": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5
+            },
+            "bottom": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5
+            },
+            "left": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.5
+            }
+          }
         }
       },
       "description": "No build timestamp: the spec must be a pure function of its inputs or the content-addressed cache never hits. Run provenance lives in run.json."

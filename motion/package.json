@@ -1,0 +1,29 @@
+{
+  "name": "videobot-motion",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tier A motion engine \u2014 compiles scene-spec.json into animation",
+  "scripts": {
+    "serve": "vite",
+    "build": "vite build",
+    "render": "vite build && node scripts/render.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "stills": "node scripts/stills.mjs",
+    "prepare-data": "node scripts/prepare-data.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@motion-canvas/2d": "^3.17.2",
+    "@motion-canvas/core": "^3.17.2"
+  },
+  "devDependencies": {
+    "@motion-canvas/ui": "^3.17.2",
+    "@motion-canvas/vite-plugin": "^3.17.2",
+    "playwright": "^1.63.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}
