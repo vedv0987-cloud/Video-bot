@@ -25,12 +25,14 @@ research ──▶ script ──▶ voice ─┬─▶ align ─┐
 The motion layer is a separate TypeScript project under [`motion/`](motion/), joined to
 the content layer only by the spec file. See [motion/README.md](motion/README.md).
 
-On a Mac, one command takes a clean checkout all the way to a spoken spec —
+On a Mac, one command takes a clean checkout all the way to a finished MP4 —
 it picks an interpreter the ML stack will install on, adds espeak-ng and Kokoro,
-and runs the pipeline:
+builds the spec, then renders it:
 
 ```bash
-./scripts/setup-mac.sh "dehydration"
+./scripts/make-video.sh "dehydration"                      # → output/<slug>/<slug>-9x16.mp4
+./scripts/make-video.sh "dehydration" --scale 0.25 --seconds 3   # fast preview
+./scripts/setup-mac.sh "dehydration"                       # environment + spec only
 ```
 
 Or by hand:

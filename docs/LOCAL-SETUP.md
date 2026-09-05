@@ -205,7 +205,8 @@ ffmpeg -hide_banner -encoders | grep videotoolbox
 ### Stage 2 — Voice
 
 `./scripts/setup-mac.sh` does everything in this stage, idempotently, and stops with
-the remedy rather than a stack trace when the interpreter is wrong. By hand:
+the remedy rather than a stack trace when the interpreter is wrong;
+`./scripts/make-video.sh` carries on through the motion layer to an MP4. By hand:
 
 ```bash
 brew install espeak-ng       # Kokoro's phonemiser falls back to it for odd words
@@ -221,6 +222,18 @@ container: 33 s of speech in 25 s wall, no GPU — the Air should beat that).
 The voice is **seeded** (`KOKORO_SEED`), so re-running the voice node reproduces the same
 wav byte for byte and everything downstream stays cached. Changing the voice or the seed
 changes the model id, which changes the cache key — that is deliberate.
+
+That reproducibility is per machine. The same script and seed produce the same *length*
+everywhere but not the same samples: measured, an M5 and a Linux x86 box agreed on 32.72 s
+to the millisecond and disagreed on the bytes. Float arithmetic diverges across
+architectures. So never copy `.cache/voice/` between machines. To check the invariant
+holds on yours:
+
+```bash
+videobot --topic "dehydration" --voice kokoro --force voice
+```
+
+The digest printed next to `voice` must match the one from the run before it.
 
 **Verify:** the WAV under `.cache/voice/` is one you can listen to, and the spec's
 `audio.provenance.voice.backend` reads `kokoro`, not `null`.
