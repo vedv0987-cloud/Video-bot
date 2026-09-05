@@ -27,7 +27,8 @@ or algorithmic has failed, however correct its content.
 
 ## Current state
 
-**Phases 1 and 2 are complete and merged. Phase 3 is next.** 113 tests pass.
+**Phases 1, 2 and 3 are complete and merged. Phase 4 is next.** 115 Python tests
+and 18 TypeScript tests pass.
 
 ```
 research ──▶ script ──▶ voice ─┬─▶ align ─┐
@@ -45,10 +46,15 @@ Retrieval is live (Wikipedia + PubMed). Voice, alignment, beats and the rewriter
 behind interfaces with deterministic offline defaults; real backends are selected with
 `--voice kokoro|chatterbox`, `--aligner whisperx`, `--beats librosa`, `--rewriter qwen3`.
 
-**Phase 3** = the Tier A motion engine: a Motion Canvas project, a spec→scene compiler,
-and the component library (statement card, stat counter, list reveal, lower third, end
-card) with the easing, stagger and motion-blur defaults from UPGRADE-PLAN §5.1–5.2 baked
-in. It needs no GPU. On Ved's hardware it is the single highest-return step remaining.
+The **motion layer** lives in `motion/` (Motion Canvas, MIT). `motion/src/lib/compile.ts`
+turns a spec into an engine-independent render plan; `render.tsx` interprets it;
+`components/` holds the five card types. `npm run stills` pulls PNGs through headless
+Chromium without opening the editor.
+
+**Phase 4** = finishing: libass karaoke captions from `audio.words`, two-pass loudnorm to
+-14 LUFS with sidechain ducking, a single LUT grade, the 9:16 / 1:1 / 16:9 encode ladder,
+QC gates, and OpenTimelineIO export. Video encode is still unwired — the motion layer
+currently produces stills, not an MP4.
 
 ---
 
@@ -97,6 +103,11 @@ Each of these was a real bug found by running the thing, not by reading it.
   elements carry `cite`.
 - **`$schema` leaked into the brand digest**, changing a render's identity when the file
   moved. It is stripped before hashing.
+- **Canvas text falls back silently when the face has not loaded.** The first stills came
+  out in Helvetica. Inter is now self-hosted via `@fontsource-variable/inter` and the
+  renderer awaits `document.fonts.ready`.
+- **The safe area used to cross the seam as a name.** The renderer would have needed its
+  own copy of the platform table; the numbers now travel in `meta.safe_area`.
 
 ---
 
@@ -113,6 +124,8 @@ Each of these was a real bug found by running the thing, not by reading it.
   `--offline`.
 - Comments explain *why*, never *what*. Match the surrounding density.
 - Schemas live in `src/videobot/schema/` as package data so they resolve from any cwd.
+- The motion layer has its own suite: `cd motion && npm test` (pure compiler logic, no
+  browser) and `npm run typecheck`. Run both before pushing anything under `motion/`.
 
 ---
 

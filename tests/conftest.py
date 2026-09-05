@@ -14,6 +14,7 @@ _MINIMAL: dict[str, Any] = {
         "aspect": "9:16",
         "fps": 30,
         "resolution": [2160, 3840],
+        "safe_area": {"name": "social-9x16", "top": 0.12, "right": 0.06, "bottom": 0.2, "left": 0.06},
     },
     "brand": {"id": "health-v2", "digest": "abcdef1234567890"},
     "audio": {

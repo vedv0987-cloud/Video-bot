@@ -6,7 +6,7 @@ Automated short-form health & fitness video pipeline — free and open-source en
 - [`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md) — v2 architecture, 2026 tool stack, and the craft rules
 - [`docs/LOCAL-SETUP.md`](docs/LOCAL-SETUP.md) — running the GPU stages on your own machine, by hardware tier
 
-## Status: Phase 2 — content layer complete
+## Status: Phase 3 — motion layer renders
 
 The content layer produces a **scene spec**: a declarative, engine-agnostic
 description of the finished video, with live citations, a voiceover, word
@@ -16,8 +16,13 @@ the spec and is deliberately swappable (UPGRADE-PLAN §2).
 ```
 research ──▶ script ──▶ voice ─┬─▶ align ─┐
     │           │              └─▶ beats ─┴─▶ compose ──▶ scene-spec.json
-    └───────────┴─────────────────────────────────▶ cache (.cache/)
+    └───────────┴─────────────────────────────────▶ cache (.cache/)   │
+                                                                       ▼
+                                            motion/  (Motion Canvas) ──▶ frames
 ```
+
+The motion layer is a separate TypeScript project under [`motion/`](motion/), joined to
+the content layer only by the spec file. See [motion/README.md](motion/README.md).
 
 Retrieval is live (Wikipedia + PubMed). Voice, alignment and beats sit behind
 interfaces with deterministic offline defaults, so the graph runs anywhere and

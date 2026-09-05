@@ -10,3 +10,8 @@ venv/
 # Regenerable pipeline outputs
 .cache/
 output/
+
+# Motion layer
+motion/node_modules/
+motion/dist/
+motion/data/
