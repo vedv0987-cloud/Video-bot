@@ -204,6 +204,9 @@ ffmpeg -hide_banner -encoders | grep videotoolbox
 
 ### Stage 2 — Voice
 
+`./scripts/setup-mac.sh` does everything in this stage, idempotently, and stops with
+the remedy rather than a stack trace when the interpreter is wrong. By hand:
+
 ```bash
 brew install espeak-ng       # Kokoro's phonemiser falls back to it for odd words
 pip install kokoro soundfile
