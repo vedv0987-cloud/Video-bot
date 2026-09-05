@@ -3,6 +3,7 @@
 Automated short-form health & fitness video pipeline — free and open-source end to end.
 
 - [`video-bot-roadmap.md`](video-bot-roadmap.md) — the original ten-stage pipeline
+- [`docs/MASTER-PLAN.md`](docs/MASTER-PLAN.md) — **the studio plan**: full architecture for the dashboard, AI director, asset engine, publishing and rendering
 - [`docs/UPGRADE-PLAN.md`](docs/UPGRADE-PLAN.md) — v2 architecture, 2026 tool stack, and the craft rules
 - [`docs/LOCAL-SETUP.md`](docs/LOCAL-SETUP.md) — running the GPU stages on your own machine, by hardware tier
 
