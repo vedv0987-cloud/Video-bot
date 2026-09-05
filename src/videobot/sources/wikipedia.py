@@ -80,6 +80,7 @@ def domain_score(text: str) -> int:
 
 class WikipediaSource:
     kind = "wikipedia"
+    version = "2"
 
     def fetch(self, topic: str, limit: int) -> Sequence[Evidence]:
         payload = self._summary(topic)

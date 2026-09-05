@@ -105,6 +105,7 @@ class CommonsImageSource:
     """Searches Commons for usable stills on a topic."""
 
     kind = "commons"
+    version = "1"
 
     def fetch(self, topic: str, limit: int) -> Sequence[Picture]:
         payload = get_json(

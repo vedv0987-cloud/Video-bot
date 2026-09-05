@@ -170,12 +170,14 @@ def test_ncbi_identity_omits_email_unless_opted_in(monkeypatch):
 def test_a_failing_source_does_not_stop_the_run():
     class Broken:
         kind = "broken"
+        version = "1"
 
         def fetch(self, topic, limit):
             raise RuntimeError("upstream is down")
 
     class Working:
         kind = "working"
+        version = "1"
 
         def fetch(self, topic, limit):
             return [Evidence("Some fact about water.", "PMID:1", "working", "T", "u")]
