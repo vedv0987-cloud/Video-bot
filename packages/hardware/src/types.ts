@@ -31,6 +31,13 @@ export interface DiskInfo {
   freeBytes: number;
 }
 
+export interface PythonInfo extends CommandProbe {
+  major?: number;
+  minor?: number;
+  /** Whether the ML stack this pipeline needs will actually install. */
+  usableForPipeline: boolean;
+}
+
 export interface FfmpegInfo extends CommandProbe {
   encoders: string[];
   hasX264: boolean;
@@ -47,7 +54,7 @@ export interface HardwareReport {
   memory: MemoryInfo;
   disk: DiskInfo;
   node: CommandProbe;
-  python: CommandProbe;
+  python: PythonInfo;
   chromium: CommandProbe;
   ffmpeg: FfmpegInfo;
   warnings: string[];
@@ -59,6 +66,8 @@ export interface ResourceBudget {
   concurrentRenders: number;
   /** Workers inside a single Remotion render. Benchmark before trusting. */
   renderConcurrency: number;
+  /** What this machine could sustain with memory free — for the "close some apps" hint. */
+  capacityConcurrency: number;
   ffmpegProcesses: number;
   ttsProcesses: number;
   assetDownloads: number;

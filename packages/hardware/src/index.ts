@@ -4,8 +4,10 @@ import {
   detectDisk,
   detectFfmpeg,
   detectMemory,
+  detectPython,
   osVersion,
-  probeCommand,
+  PYTHON_MAX_EXCLUSIVE,
+  PYTHON_MIN,
 } from './probe';
 import type { HardwareReport } from './types';
 
@@ -19,7 +21,7 @@ export async function detect(diskPath?: string): Promise<HardwareReport> {
     detectCpu(),
     detectMemory(),
     detectDisk(diskPath),
-    probeCommand(['python3', 'python']),
+    detectPython(),
     detectChromium(),
     detectFfmpeg(),
   ]);
@@ -44,7 +46,17 @@ export async function detect(diskPath?: string): Promise<HardwareReport> {
   if (!chromium.found) {
     warnings.push('no Chromium found — Remotion will download its own on first render');
   }
-  if (!python.found) warnings.push('python3 not found — the content pipeline cannot run');
+  if (!python.found) {
+    warnings.push('python3 not found — the content pipeline cannot run');
+  } else if (!python.usableForPipeline) {
+    warnings.push(
+      `Python ${python.major}.${python.minor} will not install the pipeline's ML stack: ` +
+        `kokoro-onnx and whisperx both pin python <${PYTHON_MAX_EXCLUSIVE.major}.` +
+        `${PYTHON_MAX_EXCLUSIVE.minor}, and this project needs >=${PYTHON_MIN.major}.` +
+        `${PYTHON_MIN.minor}. Install Python 3.12 (brew install python@3.12) and build ` +
+        `the venv with it: python3.12 -m venv .venv`,
+    );
+  }
 
   return {
     platform: process.platform,

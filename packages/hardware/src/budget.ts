@@ -17,29 +17,50 @@ const GB = 1024 ** 3;
 /** Chromium page + decoded frames for one Remotion worker, observed order of magnitude. */
 const MEMORY_PER_RENDER_WORKER = 1.1 * GB;
 const OS_HEADROOM = 5 * GB;
+/** Left unclaimed so a render does not consume the last of free memory. */
+const RENDER_SAFETY_MARGIN = 1.5 * GB;
+
+const gbLabel = (bytes: number) => `${(bytes / GB).toFixed(1)} GB`;
 
 export function planResources(report: HardwareReport): ResourceBudget {
   const reasons: string[] = [];
   const { cores, performanceCores, emulated } = report.cpu;
   const totalGb = report.memory.totalBytes / GB;
 
-  // Workers are bounded by memory before they are bounded by cores. On 16 GB
-  // that lands around 6; on 8 GB it lands at 2, which is the correct answer
-  // even though the core count says otherwise.
-  const memoryCeiling = Math.max(
+  // Two memory ceilings, and they answer different questions.
+  //
+  // Capacity is what the machine could sustain with nothing else running.
+  // Headroom is what fits *right now*, given whatever is already open. Sizing
+  // from capacity alone is how a budget recommends four workers on a machine
+  // with four gigabytes free and then swaps it to a halt.
+  const capacityCeiling = Math.max(
     1,
     Math.floor((report.memory.totalBytes - OS_HEADROOM) / MEMORY_PER_RENDER_WORKER),
+  );
+  const headroomCeiling = Math.max(
+    1,
+    Math.floor((report.memory.freeBytes - RENDER_SAFETY_MARGIN) / MEMORY_PER_RENDER_WORKER),
   );
 
   // Performance cores do the work; efficiency cores make a render slower when
   // frames are distributed evenly across a heterogeneous CPU.
   const coreCeiling = Math.max(1, performanceCores ?? Math.ceil(cores / 2));
 
-  let renderConcurrency = Math.max(1, Math.min(memoryCeiling, coreCeiling));
+  const capacityConcurrency = Math.max(1, Math.min(capacityCeiling, coreCeiling));
+  let renderConcurrency = Math.max(1, Math.min(headroomCeiling, capacityConcurrency));
+
   reasons.push(
-    `render concurrency ${renderConcurrency}: min(memory ceiling ${memoryCeiling}, ` +
-      `performance cores ${coreCeiling}) — provisional until benchmarked`,
+    `render concurrency ${renderConcurrency}: min(free memory fits ${headroomCeiling}, ` +
+      `total memory supports ${capacityCeiling}, performance cores ${coreCeiling}) — ` +
+      `provisional until benchmarked`,
   );
+  if (renderConcurrency < capacityConcurrency) {
+    reasons.push(
+      `this machine could run ${capacityConcurrency} workers with memory free; ` +
+        `${gbLabel(report.memory.totalBytes - report.memory.freeBytes)} is currently in ` +
+        `use, so closing applications before a render is worth more than any setting here`,
+    );
+  }
 
   if (emulated) {
     renderConcurrency = Math.max(1, Math.floor(renderConcurrency / 2));
@@ -63,6 +84,7 @@ export function planResources(report: HardwareReport): ResourceBudget {
     // on a fanless chassis it mostly buys thermal throttling.
     concurrentRenders: 1,
     renderConcurrency,
+    capacityConcurrency,
     ffmpegProcesses: 2,
     // Model load dominates TTS cost; parallel loads thrash a shared memory pool.
     ttsProcesses: 1,
